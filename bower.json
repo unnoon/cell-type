@@ -1,0 +1,31 @@
+{
+  "name": "cell-type",
+  "description": "Fast JS Type implementation.",
+  "main": "src/Type.js",
+  "authors": [
+    "Rogier Geertzema"
+  ],
+  "license": "MIT",
+  "keywords": [
+    "type",
+    "bag",
+    "fast"
+  ],
+  "moduleType": [
+    "amd",
+    "globals",
+    "node",
+    "es6"
+  ],
+  "homepage": "https://github.com/unnoon/cell-type",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test"
+  ],
+  "devDependencies": {
+    "benchmark": "^2.1.1",
+    "lodash": "^4.14.0"
+  }
+}
