@@ -7,12 +7,37 @@
         <title>Just to run some tests</title>
     </head>
     <body>
-        <!--<script src="src/Type.js"></script>-->
-        <script src="test/prototypes/syntax.js"></script>
+        <script src="src/Type.js"></script>
+        <!--<script src="test/prototypes/syntax.js"></script>-->
         <script>
+            let SKiller = new Type('S-Killer').properties({
+                init()
+                {
+                    this.name = 'skiller';
 
+                    return this
+                }
+            }).out;
 
-            console.log();
+            let CKiller = Type('C-Killer').links(SKiller).properties({
+                init()
+                {
+//                    this.name = '';
+//                    super.init(); // not working boehoehoe
+                    SKiller.init.call(this);
+
+                    this.name += '-ckiller';
+
+                    return this
+                }
+            }).out;
+
+            ckiller = Object.create(CKiller).init();
+
+            console.log(ckiller.name);
+//            tkiller = TKiller2.spawn(); // TODO
+
+//            let huh = Type().out;
         </script>
     </body>
 </html>
