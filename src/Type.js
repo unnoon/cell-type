@@ -43,7 +43,7 @@ const properties = {
     }},
     settings: {[$attrs]: "static", value: {
         rgx: {
-            upper:  /\b\._upper\b/,
+            upper:             /\bthis\._upper\b/,
             illegalPrivateUse: /\b(?!this)[\w\$]+\._[^_\.][\w\$]+\b/
         }
     }},
@@ -58,7 +58,7 @@ const properties = {
      * @return {Type} new Type
      */
     init(name, options={})
-    {   if(!name) {throw "Missing arg 'name' for Type.init."}
+    {   if(!name) {throw new Error("Missing arg 'name' for Type.init.")} // TODO some protection about forgetting to use out
 
         this.name  = name;
         this._type = null;
@@ -77,7 +77,7 @@ const properties = {
     "@attrs: static";
     {
         return Object.assign(proto, {
-            constructor: function Type() {}, // TODO constructor shizzle
+            constructor: function Type() {}, // TODO constructor support shizzle
             [$type]:     this // store the Type model
         });
     }},
@@ -225,26 +225,32 @@ function processDescAttrs(dsc)
 
 function enhanceProperty(obj, prop, dsc)
 {
-    ['value', 'get', 'set'].forEach(method => {
+    ['value', 'get', 'set'].forEach(method => { // FIXME this does not work for getters/setters yet.
         if(typeof(dsc[method]) !== 'function') {return} // continue
 
-        if(properties.settings.value.rgx.upper.test(dsc[method])) {upperEnhanceProperty(obj, prop, dsc, method)}
+        if(properties.settings.value.rgx.upper.test(dsc[method])) {
+            dsc[method] = upperEnhanceProperty(obj, prop, dsc, method)
+        }
     });
 }
 
 function upperEnhanceProperty(obj, prop, dsc, method)
 {
-    dsc[method] = upperEnhance(obj, prop, dsc[method]);
+    return upperEnhance(obj, prop, dsc[method]);
 
     function upperEnhance(obj, prop, fn)
     {
-        const efn = function () {return fn.apply(efn[$ctx] = this, arguments)};
+        efn[$owner] = obj;
 
-        efn[$owner] = obj; // store the owner of the function on the function itself. So we can change it dynamically.
-        efn[$ctx]   = null;
-        efn._upper  = function(...args) {
-            return Reflect.getPrototypeOf(efn[$owner])[prop].apply(efn[$ctx], args);
-        };
+        function efn(...args) {
+            var tmp = this._upper;
+            var result;
+            this._upper = (...args) => Reflect.getPrototypeOf(efn[$owner])[prop].apply(this, args); // dynamically get the upper method
+            result = fn.apply(this, args);
+            this._upper = tmp;
+
+            return result;
+        }
 
         return efn
     }

@@ -10,35 +10,42 @@
         <script src="src/Type.js"></script>
         <!--<script src="test/prototypes/syntax.js"></script>-->
         <script>
-            const SKiller = new Type('S-Killer').properties({
-                init()
+            const B = new Type('Beginner').properties({
+                init: function(skill)
                 {
-                    this.name = 'skiller2';
+                    this.skills = ['farting'];
+                    if(skill) {this.skills.push(skill)}
 
                     return this
                 }
             }).out;
 
-            const CKiller = Type('C-Killer').links(SKiller).properties({
-                init() // this sucks because the shorthand method notation does not produced named functions...
+            const S = new Type('Specialist').links(B).properties({
+                init: function(skill)
                 {
-//                    this.name = '';
-//                    super.init(); // not working boehoehoe
-                    this.init._upper();
-//                    SKiller.init.call(this);
-
-                    this.name += '-ckiller';
+                    this._upper(skill);
+                    this.skills.push('burping');
 
                     return this
                 }
             }).out;
 
-            ckiller = Object.create(CKiller).init();
+            const E = new Type('Expert').links(S).properties({
+                init: function(skill)
+                {
+                    this._x = 7;
 
-            console.log(ckiller.name);
-//            tkiller = TKiller2.spawn(); // TODO
+                    this._upper(skill);
+                    this.skills.push('swearing');
 
-//            let huh = Type().out;
+                    return this
+                }
+            }).out;
+
+            const e = Object.create(E).init('theFinger');
+
+            console.log(e.skills);
+
         </script>
     </body>
 </html>

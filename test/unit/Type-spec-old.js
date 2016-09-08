@@ -1,7 +1,7 @@
 define([
-    'bottom_line',
-    'cell/core/Type'
-], function(_, Type) {
+    // 'bottom_line',
+    'src/Type'
+], function(Type) {
     beforeEach(function() {
         sinon.stub(console, 'log');
         sinon.stub(console, 'warn');
