@@ -19,11 +19,13 @@ const one  = 1|0;
 
 let   iid  = 0|0; // incremental counter for instance id's
 
-const dsc     = Symbol.for('cell-type.dsc');
-const statics = Symbol.for('cell-type.statics');
-const owner   = Symbol.for('cell-type.owner'); // symbol to store the owner of a function/object so we can get the proper super.
-const inner   = Symbol.for('cell-type.inner'); // reference to the wrapped inner function
-const meta    = Symbol.for('cell-type.meta');  // general symbol for meta data
+const $attrs   = Symbol.for('cell-type.dsc');
+const $statics = Symbol.for('cell-type.statics');
+const $ctx     = Symbol.for('cell-type.ctx');
+const $owner   = Symbol.for('cell-type.owner'); // symbol to store the owner of a function/object so we can get the proper super.
+const $inner   = Symbol.for('cell-type.inner'); // reference to the wrapped inner function
+const $meta    = Symbol.for('cell-engine.meta');  // general symbol for meta data
+const $type    = Symbol.for('cell-type');  // general symbol for meta data
 
 const properties = {
     /**
@@ -33,18 +35,18 @@ const properties = {
 
      * @type Object
      */
-    info: {[dsc]: "static",
+    info: {[$attrs]: "static", value: {
         "name"       : "cell-type",
         "description": "Prototypal inheritance algorithm supporting traits & dependency injection.",
         "version"    : "/*?= VERSION */",
         "url"        : "https://github.com/unnoon/cell-type"
-    },
-    settings: {[dsc]: "static",
+    }},
+    settings: {[$attrs]: "static", value: {
         rgx: {
-            upper:  /\bthis\._upper\b/, // make sure we don't mistake static _upper reference // FIXME change to super
+            upper:  /\b\._upper\b/,
             illegalPrivateUse: /\b(?!this)[\w\$]+\._[^_\.][\w\$]+\b/
         }
-    },
+    }},
     /**
      * @method Type#init
      * @desc
@@ -56,8 +58,9 @@ const properties = {
      * @return {Type} new Type
      */
     init(name, options={})
-    {   if(!name) {throw "Missing arg 'name' for Type."}
+    {   if(!name) {throw "Missing arg 'name' for Type.init."}
 
+        this.name  = name;
         this._type = null;
         
         return this
@@ -66,15 +69,16 @@ const properties = {
      * @method Type.decorate
      * @desc   Decorates an object as a Type prototype object.
      *
-     * @param {Object} type - The object to be decorated.
+     * @param {Object} proto - The object to be decorated.
      *
      * @returns {Object} The decorated object.
      */
-    decorate(type) {
-    "@dsc: static";
+    decorate(proto) {
+    "@attrs: static";
     {
-        return extend(type, {
+        return Object.assign(proto, {
             constructor: function Type() {}, // TODO constructor shizzle
+            [$type]:     this // store the Type model
         });
     }},
     /**
@@ -89,7 +93,7 @@ const properties = {
      * @returns {Type} this
      */
     links(obj) {
-    "@dsc: alias=inherits";
+    "@attrs: alias=inherits";
     {
         this.type = this.decorate(Object.create(obj));
 
@@ -151,9 +155,9 @@ const properties = {
  */
 function Type(name, options={})
 {   // allow for omitting the new keyword
-    const type = Type.prototype.isPrototypeOf(this) ? this : Object.create(Type.prototype);
+    const self = Type.prototype.isPrototypeOf(this) ? this : Object.create(Type.prototype);
 
-    return type.init(name, options);
+    return self.init(name, options);
 }
 
 extend(Type.prototype, properties);
@@ -168,17 +172,20 @@ extend(Type.prototype, properties);
  *
  * @returns {Object} the object after extension.
  */
+// TODO Know that this code does not copy symbols. So a external extend/assign/adopt method is a must!
 function extend(obj, properties)
 {
     Object.keys(properties).forEach(prop => {
-        let desc    = processDescAttrs(Object.getOwnPropertyDescriptor(properties, prop));
-        let names   = desc.alias || []; names.unshift(prop);
+        let dsc     = processDescAttrs(Object.getOwnPropertyDescriptor(properties, prop)); dsc.enumerable = false; // mimic default js behaviour for 'classes'
+        let names   = dsc.alias || []; names.unshift(prop);
         let symbol  = prop.match(/@@(.+)/); symbol = symbol ? symbol[1] : '';
-        let addProp = function(obj, name) {if(symbol) {obj[Symbol[symbol]] = desc.value} else {Reflect.defineProperty(obj, name, desc)}};
+        let addProp = function(obj, name) {if(symbol) {obj[Symbol[symbol]] = dsc.value} else {Reflect.defineProperty(obj, name, dsc)}};
+
+        enhanceProperty(obj, prop, dsc);
 
         // TODO frozen, extensible, sealed, override
 
-        names.forEach(name => {addProp(obj, name); if(desc.static) {addProp(obj.constructor, name)}});
+        names.forEach(name => {addProp(obj, name); if(dsc.static) {addProp(obj.constructor, name)}});
     });
 
     return obj
@@ -189,18 +196,18 @@ function extend(obj, properties)
  * @desc
  *       processes any attributes passed to a function or on the special symbol, in case of a property, and adds these to the descriptor.
  *
- * @param {Object} desc - Property descriptor to be processed.
+ * @param {Object} dsc - Property descriptor to be processed.
  *
  * @returns {Object} The processed descriptor.
  */
-function processDescAttrs(desc)
+function processDescAttrs(dsc)
 {
-    let tmp   = `${desc.value || desc.get || desc.set}`.match(/@dsc:(.*?);/);
-    let tmp2  = `${tmp? tmp[1] : desc.value && desc.value[dsc] || ''}`.replace(/[\s]*([=\|\s])[\s]*/g, '$1'); // prettify: remove redundant white spaces
-    let attrs = tmp2.match(/[!\$\w]+(=[\$\w]+(\|[\$\w]+)*)?/g) || []; // filter attributes including values
+    let tmp        = `${dsc.value || dsc.get || dsc.set}`.match(/@attrs:(.*?);/);
+    let tmp2       = `${tmp? tmp[1] : dsc.value && dsc.value[$attrs] || ''}`.replace(/[\s]*([=\|\s])[\s]*/g, '$1'); // prettify: remove redundant white spaces
+    let attributes = tmp2.match(/[!\$\w]+(=[\$\w]+(\|[\$\w]+)*)?/g) || []; // filter attributes including values
     let attr, value;
 
-    for(attr of attrs)
+    for(attr of attributes)
     {   switch(true)
         {
             case(  !attr.indexOf('!')) : value = false;                  attr = attr.slice(1); break;
@@ -208,10 +215,43 @@ function processDescAttrs(desc)
             default                    : value = true;
         }
 
-        desc[attr] = value;
+        dsc[attr] = value;
     }
+    // if value is a descriptor set the value to the descriptor value
+    if(dsc.value && dsc.value[$attrs] !== undefined) {dsc.value = dsc.value.value}
 
-    return desc
+    return dsc
+}
+
+function enhanceProperty(obj, prop, dsc)
+{
+    ['value', 'get', 'set'].forEach(method => {
+        if(typeof(dsc[method]) !== 'function') {return} // continue
+
+        if(properties.settings.value.rgx.upper.test(dsc[method])) {upperEnhanceProperty(obj, prop, dsc, method)}
+    });
+}
+
+function upperEnhanceProperty(obj, prop, dsc, method)
+{
+    const upper = Reflect.getPrototypeOf(obj);
+    // const udsc  = Reflect.getOwnPropertyDescriptor(upper, prop);
+    const fn    = dsc[method];
+
+    fn[$owner] = obj; // store the owner of the function on the function itself. So we can change it dynamically.
+
+    Reflect.defineProperty(fn, '_upper', {get: function() {
+        return Reflect.getPrototypeOf(fn[$owner])[prop].bind(fn[$ctx]); // this is a bit fugly returning a newly bound function every time.
+    }});
+
+    dsc[method] = upperEnhance(prop, fn);
+
+    function upperEnhance(prop, fn)
+    {
+        return function () {
+            return fn.apply(fn[$ctx] = this, arguments);
+        };
+    }
 }
 
 /*? if(MODULE_TYPE !== 'es6') {*/

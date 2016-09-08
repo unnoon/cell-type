@@ -13,18 +13,19 @@
             let SKiller = new Type('S-Killer').properties({
                 init()
                 {
-                    this.name = 'skiller';
+                    this.name = 'skiller2';
 
                     return this
                 }
             }).out;
 
             let CKiller = Type('C-Killer').links(SKiller).properties({
-                init()
+                init: function init() // this sucks because the shorthand method notation does not produced named functions...
                 {
 //                    this.name = '';
 //                    super.init(); // not working boehoehoe
-                    SKiller.init.call(this);
+                    init._upper();
+//                    SKiller.init.call(this);
 
                     this.name += '-ckiller';
 
