@@ -10,7 +10,7 @@
         <script src="src/Type.js"></script>
         <!--<script src="test/prototypes/syntax.js"></script>-->
         <script>
-            let SKiller = new Type('S-Killer').properties({
+            const SKiller = new Type('S-Killer').properties({
                 init()
                 {
                     this.name = 'skiller2';
@@ -19,12 +19,12 @@
                 }
             }).out;
 
-            let CKiller = Type('C-Killer').links(SKiller).properties({
-                init: function init() // this sucks because the shorthand method notation does not produced named functions...
+            const CKiller = Type('C-Killer').links(SKiller).properties({
+                init() // this sucks because the shorthand method notation does not produced named functions...
                 {
 //                    this.name = '';
 //                    super.init(); // not working boehoehoe
-                    init._upper();
+                    this.init._upper();
 //                    SKiller.init.call(this);
 
                     this.name += '-ckiller';

@@ -234,23 +234,23 @@ function enhanceProperty(obj, prop, dsc)
 
 function upperEnhanceProperty(obj, prop, dsc, method)
 {
-    const upper = Reflect.getPrototypeOf(obj);
-    // const udsc  = Reflect.getOwnPropertyDescriptor(upper, prop);
-    const fn    = dsc[method];
+    const fn = dsc[method];
 
-    fn[$owner] = obj; // store the owner of the function on the function itself. So we can change it dynamically.
+    dsc[method] = upperEnhance(obj, prop, fn);
 
-    Reflect.defineProperty(fn, '_upper', {get: function() {
-        return Reflect.getPrototypeOf(fn[$owner])[prop].bind(fn[$ctx]); // this is a bit fugly returning a newly bound function every time.
-    }});
-
-    dsc[method] = upperEnhance(prop, fn);
-
-    function upperEnhance(prop, fn)
+    function upperEnhance(obj, prop, fn)
     {
-        return function () {
-            return fn.apply(fn[$ctx] = this, arguments);
+        const efn = function () {
+            return fn.apply(efn[$ctx] = this, arguments);
         };
+
+        efn[$owner] = obj; // store the owner of the function on the function itself. So we can change it dynamically.
+
+        Reflect.defineProperty(efn, '_upper', {get: function() {
+            return Reflect.getPrototypeOf(efn[$owner])[prop].bind(efn[$ctx]); // this is a bit fugly returning a newly bound function every time.
+        }});
+
+        return efn
     }
 }
 
