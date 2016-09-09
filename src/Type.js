@@ -236,16 +236,16 @@ function enhanceProperty(obj, prop, dsc)
 
 function upperEnhanceProperty(obj, prop, dsc, method)
 {
-    return upperEnhance(obj, prop, dsc[method]);
+    return upperEnhance(obj, prop, dsc[method], method);
 
-    function upperEnhance(obj, prop, fn)
+    function upperEnhance(obj, prop, fn, method)
     {
         efn[$owner] = obj;
 
         function efn(...args) {
             var tmp = this._upper;
             var result;
-            this._upper = (...args) => Reflect.getPrototypeOf(efn[$owner])[prop].apply(this, args); // dynamically get the upper method
+            this._upper = (...args) => getPropertyDescriptor(Reflect.getPrototypeOf(efn[$owner]), prop)[method].apply(this, args); // dynamically get the upper method
             result = fn.apply(this, args);
             this._upper = tmp;
 
@@ -254,6 +254,25 @@ function upperEnhanceProperty(obj, prop, dsc, method)
 
         return efn
     }
+}
+
+/**
+ * Gets the descriptor of a property in prototype chain
+ *
+ * @param {Object} obj  - the object in the prototype chain
+ * @param {string} prop - the name of the property
+ *
+ * @returns {Object} - the property descriptor
+ */
+function getPropertyDescriptor(obj, prop) {
+    var proto = obj;
+
+    do
+    {
+        if (proto.hasOwnProperty(prop)) {break}
+    } while (proto = Object.getPrototypeOf(proto));
+
+    return Object.getOwnPropertyDescriptor(proto, prop)
 }
 
 /*? if(MODULE_TYPE !== 'es6') {*/
