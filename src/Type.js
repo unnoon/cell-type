@@ -14,18 +14,18 @@
 /*es6*//*? } else { write('export default Type\n\n') } *//*<3*/
 
 // int32 consts
-const zero = 0|0;
-const one  = 1|0;
+const zero  = 0|0;
+const one   = 1|0;
+const ATTRS = ['static', 'alias', 'override', 'enumerable', 'configurable', 'writable', 'const', 'readonly', 'frozen', 'sealed', 'extensible'];
 
 let   iid  = 0|0; // incremental counter for instance id's
 
-const $attrs   = Symbol.for('cell-type.dsc');
+const $attrs   = Symbol.for('cell-type.attrs');
 const $statics = Symbol.for('cell-type.statics');
-const $ctx     = Symbol.for('cell-type.ctx');
 const $owner   = Symbol.for('cell-type.owner'); // symbol to store the owner of a function/object so we can get the proper super.
 const $inner   = Symbol.for('cell-type.inner'); // reference to the wrapped inner function
 const $meta    = Symbol.for('cell-engine.meta');  // general symbol for meta data
-const $type    = Symbol.for('cell-type');  // general symbol for meta data
+const $type    = Symbol.for('cell-type');  // symbol for type data stored on the proto
 
 const properties = {
     /**
@@ -78,7 +78,8 @@ const properties = {
     {
         return Object.assign(proto, {
             constructor: function Type() {}, // TODO constructor support shizzle
-            [$type]:     this // store the Type model
+            [$type]:     this, // store the Type model
+            [$statics]:  {} // stores static wrapped properties so they don't pollute the prototype
         });
     }},
     /**
@@ -160,6 +161,8 @@ function Type(name, options={})
     return self.init(name, options);
 }
 
+Type.prototype[$statics] = {}; // object to store wrapped statics original versions.
+
 extend(Type.prototype, properties);
 
 /**
@@ -183,8 +186,6 @@ function extend(obj, properties)
 
         enhanceProperty(obj, prop, dsc);
 
-        // TODO frozen, extensible, sealed, override
-
         names.forEach(name => {addProp(obj, name); if(dsc.static) {addProp(obj.constructor, name)}});
     });
 
@@ -204,7 +205,7 @@ function processDescAttrs(dsc)
 {
     let tmp        = `${dsc.value || dsc.get || dsc.set}`.match(/@attrs:(.*?);/);
     let tmp2       = `${tmp? tmp[1] : dsc.value && dsc.value[$attrs] || ''}`.replace(/[\s]*([=\|\s])[\s]*/g, '$1'); // prettify: remove redundant white spaces
-    let attributes = tmp2.match(/[!\$\w]+(=[\$\w]+(\|[\$\w]+)*)?/g) || []; // filter attributes including values
+    let attributes = tmp2.match(/[!\$\w]+(=[\$\w]+(\|[\$\w]+)*)?/g)  || []; // filter attributes including values
     let attr, value;
 
     for(attr of attributes)
@@ -214,9 +215,12 @@ function processDescAttrs(dsc)
             case(!!~attr.indexOf('=')) : value = attr.match(/[\$\w]+/g); attr = value.shift(); break;
             default                    : value = true;
         }
+        if(!~ATTRS.indexOf(attr)) {console.warn(`'${attr}' is an unknown attribute and will not be processed.`)}
 
         dsc[attr] = value;
     }
+    if(dsc.readonly || dsc.const) {dsc.writable = false}
+
     // if value is a descriptor set the value to the descriptor value
     if(dsc.value && dsc.value[$attrs] !== undefined) {dsc.value = dsc.value.value}
 
@@ -225,54 +229,66 @@ function processDescAttrs(dsc)
 
 function enhanceProperty(obj, prop, dsc)
 {
-    ['value', 'get', 'set'].forEach(method => { // FIXME this does not work for getters/setters yet.
-        if(typeof(dsc[method]) !== 'function') {return} // continue
+    ['value', 'get', 'set'].forEach(method => {
+        if(!dsc.hasOwnProperty(method)) {return} // continue
 
-        if(properties.settings.value.rgx.upper.test(dsc[method])) {
-            dsc[method] = upperEnhanceProperty(obj, prop, dsc, method)
-        }
+        if((dsc.static && typeof(dsc[method]) !== 'function'))    {staticEnhanceProperty(obj, prop, dsc)}
+        if(properties.settings.value.rgx.upper.test(dsc[method])) {upperEnhanceProperty(obj, prop, dsc, method)}
+        if(dsc.extensible === false)                              {Object.preventExtensions(dsc[method])}
+        if(dsc.sealed)                                            {Object.seal(dsc[method])}
+        if(dsc.frozen)                                            {Object.freeze(dsc[method])}
     });
+}
+
+function staticEnhanceProperty(obj, prop, dsc)
+{
+    Reflect.defineProperty(obj[$statics], prop, dsc); // add the original property t the special statics symbol
+
+    dsc.get = () => obj[$statics][prop];
+    dsc.set = dsc.writable
+        ? (val) => obj[$statics][prop] = val
+        : (val) => console.warn(`Trying to set value '${val}' on readonly (static) property '${prop}'.`);
+    delete dsc.value;
+    delete dsc.writable;
 }
 
 function upperEnhanceProperty(obj, prop, dsc, method)
 {
-    return upperEnhance(obj, prop, dsc[method], method);
+    const fn = dsc[method];
 
-    function upperEnhance(obj, prop, fn, method)
-    {
-        efn[$owner] = obj;
+    efn[$owner] = obj;
+    efn[$inner] = fn;
 
-        function efn(...args) {
-            var tmp = this._upper;
-            var result;
-            this._upper = (...args) => getPropertyDescriptor(Reflect.getPrototypeOf(efn[$owner]), prop)[method].apply(this, args); // dynamically get the upper method
-            result = fn.apply(this, args);
-            this._upper = tmp;
+    function efn(...args) {
+        let tmp = this._upper, out;
 
-            return result;
-        }
+        this._upper = (...args) => getPropertyDescriptor(Reflect.getPrototypeOf(efn[$owner]), prop)[method].apply(this, args); // dynamically get the upper method
+        out = fn.apply(this, args);
+        this._upper = tmp;
 
-        return efn
+        return out;
     }
+
+    dsc[method] = efn
 }
 
 /**
- * Gets the descriptor of a property in prototype chain
+ * Gets the descriptor of a property in a prototype chain
  *
  * @param {Object} obj  - the object in the prototype chain
  * @param {string} prop - the name of the property
  *
  * @returns {Object} - the property descriptor
  */
-function getPropertyDescriptor(obj, prop) {
-    var proto = obj;
+function getPropertyDescriptor(obj, prop) 
+{   if (obj.hasOwnProperty(prop)) {return Object.getOwnPropertyDescriptor(obj, prop)}
 
-    do
+    while (obj = Object.getPrototypeOf(obj))
     {
-        if (proto.hasOwnProperty(prop)) {break}
-    } while (proto = Object.getPrototypeOf(proto));
+        if (obj.hasOwnProperty(prop)) {return Object.getOwnPropertyDescriptor(obj, prop)}
+    }
 
-    return Object.getOwnPropertyDescriptor(proto, prop)
+    return null
 }
 
 /*? if(MODULE_TYPE !== 'es6') {*/
