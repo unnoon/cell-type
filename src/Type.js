@@ -14,8 +14,8 @@
 /*es6*//*? } else { write('export default Type\n\n') } *//*<3*/
 
 // int32 consts
-const zero  = 0|0;
-const one   = 1|0;
+const ZERO  = 0|0;
+const ONE   = 1|0;
 const ATTRS = ['static', 'alias', 'override', 'enumerable', 'configurable', 'writable', 'const', 'readonly', 'frozen', 'sealed', 'extensible'];
 
 let   iid  = 0|0; // incremental counter for instance id's
