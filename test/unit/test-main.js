@@ -24,6 +24,8 @@ require([
 ], function() {
 
 	before(function() {
+		sinon.stub(console, 'info');
 		sinon.stub(console, 'warn');
+		sinon.stub(console, 'error');
 	});
 });

@@ -10,41 +10,20 @@
         <script src="src/Type.js"></script>
         <!--<script src="test/prototypes/syntax.js"></script>-->
         <script>
+
             const B = new Type('Beginner').properties({
-                init: function(skill)
+                init(skill)
                 {
                     this.skills = ['farting'];
                     if(skill) {this.skills.push(skill)}
 
                     return this
                 }
-            }).out;
+            });
 
-            const S = new Type('Specialist').links(B).properties({
-                init: function(skill)
-                {
-                    this._upper(skill);
-                    this.skills.push('burping');
+            let b = Object.create(B).init();
 
-                    return this
-                }
-            }).out;
-
-            const E = new Type('Expert').links(S).properties({
-                init: function(skill)
-                {
-                    this._x = 7;
-
-                    this._upper(skill);
-                    this.skills.push('swearing');
-
-                    return this
-                }
-            }).out;
-
-            const e = Object.create(E).init('theFinger');
-
-            console.log(e.skills);
+            console.log('okay');
 
         </script>
     </body>

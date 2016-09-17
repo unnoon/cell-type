@@ -24,8 +24,8 @@ const $attrs   = Symbol.for('cell-type.attrs');
 const $statics = Symbol.for('cell-type.statics');
 const $owner   = Symbol.for('cell-type.owner'); // symbol to store the owner of a function/object so we can get the proper super.
 const $inner   = Symbol.for('cell-type.inner'); // reference to the wrapped inner function
-const $meta    = Symbol.for('cell-engine.meta');  // general symbol for meta data
-const $type    = Symbol.for('cell-type');  // symbol for type data stored on the proto
+const $type    = Symbol.for('cell-type');       // symbol for type data stored on the proto
+const $ctor    = Symbol('cell-type.ctor');      // local symbol for storing ctor call information on the options object
 
 const properties = {
     /**
@@ -44,7 +44,9 @@ const properties = {
     settings: {[$attrs]: "static", value: {
         rgx: {
             upper:             /\bthis\._upper\b/,
-            illegalPrivateUse: /\b(?!this)[\w\$]+\._[^_\.][\w\$]+\b/
+            illegalPrivateUse: /\b(?!this)[\w\$]+\._[^_\.][\w\$]+\b/g,
+            thisUsage:         /\bthis(?!\.)\b/,
+            thisMethodUsage:   /\bthis\.[\$\w]+\b/g,
         }
     }},
     /**
@@ -52,13 +54,17 @@ const properties = {
      * @desc
      *         Initializes the type.
      *
-     * @param  {string} name     - name of the type.
+     * @param  {string}  name    - name of the type.
      * @param  {Object=} options - optional options object TODO implementation
      *
-     * @return {Type} new Type
+     * @return {Type} this
      */
+    // TODO check if name should be really mandatory
+    // TODO add properties based on model
     init(name, options={})
-    {   if(!name) {throw new Error("Missing arg 'name' for Type.init.")} // TODO some protection about forgetting to use out
+    {
+        if(!options[$ctor]) {throw new Error("Init not called from Type ctor. Call 'out' when creating a new Type to return the wrapped instance.")}
+        if(!name)           {throw new Error("Missing arg 'name' for Type.init.")}
 
         this.name  = name;
         this._type = null;
@@ -67,19 +73,21 @@ const properties = {
     },
     /**
      * @method Type.decorate
-     * @desc   Decorates an object as a Type prototype object.
+     * @desc
+     *         Decorates an object as a Type prototype object.
      *
      * @param {Object} proto - The object to be decorated.
+     * @param {Object} type  - Reference to the type object that will be stored under Symbol(cell-type).
      *
      * @returns {Object} The decorated object.
      */
-    decorate(proto) {
+    decorate(proto, type) {
     "@attrs: static";
     {
         return Object.assign(proto, {
             constructor: function Type() {}, // TODO constructor support shizzle
-            [$type]:     this, // store the Type model
-            [$statics]:  {} // stores static wrapped properties so they don't pollute the prototype
+            [$type]:     type, // store the Type model
+            [$statics]:  {_upper: null} // stores static wrapped properties so they don't pollute the prototype
         });
     }},
     /**
@@ -96,10 +104,22 @@ const properties = {
     links(obj) {
     "@attrs: alias=inherits";
     {
-        this.type = this.decorate(Object.create(obj));
+        this.type = this.decorate(Object.create(obj), this);
 
         return this
     }},
+    /**
+     * @name Type#out
+     * @desc
+     *       Outputs the created type object
+     *
+     * @readonly
+     * @type Object
+     */
+    get out()
+    {
+        return this.type;
+    },
     /**
      * @method Type#properties
      * @desc
@@ -116,16 +136,19 @@ const properties = {
         return this
     },
     /**
-     * @name Type#out
+     * @method Type#statics
      * @desc
-     *       Outputs the created type object
+     *         Defines statics properties. Allows one to omit the static attribute.
      *
-     * @readonly
-     * @type Object
+     * @param {Object} props - Object containing the static properties.
+     *
+     * @returns {Type} this
      */
-    get out()
+    statics(props)
     {
-        return this.type;
+        extend(this.type, props, {static: true});
+
+        return this
     },
     /**
      * @name Type#type
@@ -136,7 +159,7 @@ const properties = {
      */
     get type()
     {
-        return this._type || (this._type = this.decorate({})); // decorate a plain obj as type
+        return this._type || (this._type = this.decorate({}, this)); // decorate a plain obj as type
     },
     set type(t)
     {
@@ -145,7 +168,7 @@ const properties = {
 };
 
 /**
- * @class Type
+ * @constructor Type
  * @desc
  *        Prototypal inheritance algorithm supporting traits & dependency injection.
  *
@@ -155,13 +178,15 @@ const properties = {
  * @return {Type} new Type
  */
 function Type(name, options={})
-{   // allow for omitting the new keyword
+{
+    options[$ctor] = true; // register call from constructor
+    // allow for omitting the new keyword
     const self = Type.prototype.isPrototypeOf(this) ? this : Object.create(Type.prototype);
 
     return self.init(name, options);
 }
-
-Type.prototype[$statics] = {}; // object to store wrapped statics original versions.
+// TODO add _upper as a proper static property
+Type.prototype[$statics] = {_upper: null}; // object to store wrapped statics original versions.
 
 extend(Type.prototype, properties);
 
@@ -170,21 +195,23 @@ extend(Type.prototype, properties);
  * @desc
  *       Very simple extend function including alias, static support.
  *
- * @param {Object} obj        - object to extend.
- * @param {Object} properties - object with the extend properties.
+ * @param {Object}  obj        - object to extend.
+ * @param {Object}  properties - object with the extend properties.
+ * @param {Object=} options    - options object
  *
  * @returns {Object} the object after extension.
  */
 // TODO Know that this code does not copy symbols. So a external extend/assign/adopt method is a must!
-function extend(obj, properties)
+function extend(obj, properties, options={})
 {
     Object.keys(properties).forEach(prop => {
-        let dsc     = processDescAttrs(Object.getOwnPropertyDescriptor(properties, prop)); dsc.enumerable = false; // mimic default js behaviour for 'classes'
+        let dsc     = processDescAttrs(Object.getOwnPropertyDescriptor(properties, prop), options);
         let names   = dsc.alias || []; names.unshift(prop);
         let symbol  = prop.match(/@@(.+)/); symbol = symbol ? symbol[1] : '';
         let addProp = function(obj, name) {if(symbol) {obj[Symbol[symbol]] = dsc.value} else {Reflect.defineProperty(obj, name, dsc)}};
 
         enhanceProperty(obj, prop, dsc);
+        validations(obj, prop, dsc);
 
         names.forEach(name => {addProp(obj, name); if(dsc.static) {addProp(obj.constructor, name)}});
     });
@@ -197,16 +224,81 @@ function extend(obj, properties)
  * @desc
  *       processes any attributes passed to a function or on the special symbol, in case of a property, and adds these to the descriptor.
  *
- * @param {Object} dsc - Property descriptor to be processed.
+ * @param {Object}  dsc     - Property descriptor to be processed.
+ * @param {Object=} options - Options object
  *
  * @returns {Object} The processed descriptor.
  */
-function processDescAttrs(dsc)
+function processDescAttrs(dsc, options={})
 {
     let tmp        = `${dsc.value || dsc.get || dsc.set}`.match(/@attrs:(.*?);/);
     let tmp2       = `${tmp? tmp[1] : dsc.value && dsc.value[$attrs] || ''}`.replace(/[\s]*([=\|\s])[\s]*/g, '$1'); // prettify: remove redundant white spaces
     let attributes = tmp2.match(/[!\$\w]+(=[\$\w]+(\|[\$\w]+)*)?/g)  || []; // filter attributes including values
+
+    assignAttrsToDsc(attributes, dsc);
+    Object.assign(dsc, options);
+
+    // if value is a descriptor set the value to the descriptor value
+    if(dsc.value && dsc.value[$attrs] !== undefined) {dsc.value = dsc.value.value}
+
+    return dsc
+}
+
+function validations(obj, prop, dsc)
+{
+    ['value', 'get', 'set'].forEach(method => {
+        if(!dsc.hasOwnProperty(method)) {return} // continue
+
+        validatePrivateUse(obj, prop, dsc, method);
+        validateStaticThisUsage(obj, prop, dsc, method);
+        validateOverrides(obj, prop, dsc, method);
+    });
+}
+
+function validatePrivateUse(obj, prop, dsc, method)
+{   const matches = `${dsc[method]}`.match(properties.settings.value.rgx.illegalPrivateUse);
+
+    if(typeof(dsc[method]) !== 'function' || !matches) {return}
+
+    throw new Error(`[Type ${obj[$type].name}]: Illegal use of private propert${matches.length > 1 ? 'ies' : 'y'} '${matches}' in (${method}) method '${prop}'.`)
+}
+
+function validateStaticThisUsage(obj, prop, dsc, method)
+{   const matches   = `${dsc[method]}`.match(properties.settings.value.rgx.thisMethodUsage);
+    const thisUsage = properties.settings.value.rgx.thisUsage.test(dsc[method]);
+    let   out       = '';
+
+    if(typeof(dsc[method]) !== 'function' || !dsc.static || (!thisUsage && !matches)) {return}
+
+    if(thisUsage) {out += `[Type ${obj[$type].name}]: Illegal this usage in static method '${prop}'.`}
+    if(matches)   {
+        const illegalNonStaticProperties = [];
+
+        matches.forEach(prop => {if(!obj[$statics].hasOwnProperty(prop.slice(prop.indexOf('.')+1))) {illegalNonStaticProperties.push(prop)}});
+
+        if(illegalNonStaticProperties.length) {
+            if(out) {out += `\n`}
+            out += `[Type ${obj[$type].name}]: Illegal usage of non-static method${illegalNonStaticProperties.length > 1 ? 's' : ''} '${illegalNonStaticProperties}' in static method '${prop}'.`;
+        }
+    }
+
+    throw new Error(out)
+}
+
+function validateOverrides(obj, prop, dsc, method)
+{   const isFunction      = dsc[method] instanceof Function;
+    const methodWithUpper = isFunction && properties.settings.value.rgx.upper.test(dsc[method]);
+
+    if(!(prop in Object.getPrototypeOf(obj)) || dsc.override || methodWithUpper) {return}
+
+    console.warn(`[Type ${obj[$type].name}]: No overriding attribute ${isFunction ? 'and not calling upper ' : ''}in overriding (${method}) property '${prop}'.`);
+}
+
+function assignAttrsToDsc(attributes, dsc)
+{
     let attr, value;
+
+    dsc.enumerable = false; // default set enumerable to false
 
     for(attr of attributes)
     {   switch(true)
@@ -220,11 +312,6 @@ function processDescAttrs(dsc)
         dsc[attr] = value;
     }
     if(dsc.readonly || dsc.const) {dsc.writable = false}
-
-    // if value is a descriptor set the value to the descriptor value
-    if(dsc.value && dsc.value[$attrs] !== undefined) {dsc.value = dsc.value.value}
-
-    return dsc
 }
 
 function enhanceProperty(obj, prop, dsc)
@@ -232,22 +319,28 @@ function enhanceProperty(obj, prop, dsc)
     ['value', 'get', 'set'].forEach(method => {
         if(!dsc.hasOwnProperty(method)) {return} // continue
 
-        if((dsc.static && typeof(dsc[method]) !== 'function'))    {staticEnhanceProperty(obj, prop, dsc)}
+        if(dsc.static && 'value' in dsc)                          {staticEnhanceProperty(obj, prop, dsc, method)}
         if(properties.settings.value.rgx.upper.test(dsc[method])) {upperEnhanceProperty(obj, prop, dsc, method)}
         if(dsc.extensible === false)                              {Object.preventExtensions(dsc[method])}
         if(dsc.sealed)                                            {Object.seal(dsc[method])}
         if(dsc.frozen)                                            {Object.freeze(dsc[method])}
     });
+
 }
-
-function staticEnhanceProperty(obj, prop, dsc)
+function staticEnhanceProperty(obj, prop, dsc, method)
 {
-    Reflect.defineProperty(obj[$statics], prop, dsc); // add the original property t the special statics symbol
+    Reflect.defineProperty(obj[$statics], prop, dsc); // add the original property to the special statics symbol
 
-    dsc.get = () => obj[$statics][prop];
-    dsc.set = dsc.writable
-        ? (val) => obj[$statics][prop] = val
-        : (val) => console.warn(`Trying to set value '${val}' on readonly (static) property '${prop}'.`);
+    if(dsc[method] instanceof Function) {return} // no further processing for static methods
+
+    eget[$owner] = eset[$owner] = obj;
+
+    function eget()    {return eget[$owner][$statics][prop]}
+    function eset(val) {eset[$owner][$statics][prop] = val}
+
+    dsc.get = eget;
+    dsc.set = dsc.writable ? eset : (val) => console.warn(`Trying to set value '${val}' on readonly (static) property '${prop}'.`);
+
     delete dsc.value;
     delete dsc.writable;
 }

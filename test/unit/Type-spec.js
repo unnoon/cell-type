@@ -2,12 +2,13 @@ define([
     'src/Type'
 ], function(Type) {
 
-    const $attrs = Symbol.for('cell-type.attrs');
+    const $attrs   = Symbol.for('cell-type.attrs');
+    const $statics = Symbol.for('cell-type.statics');
 
     describe("inheritance principles", function() {
         it("should be able to use simple inheritance i.e. super/upper and proper context", function() {
             const B = new Type('Beginner').properties({
-                init: function(skill)
+                init(skill)
                 {
                     this.skills = ['farting'];
                     if(skill) {this.skills.push(skill)}
@@ -18,7 +19,7 @@ define([
 
             // allow for omitting the new keyword
             const S = Type('Specialist').links(B).properties({
-                init: function(skill)
+                init(skill)
                 {
                     this._upper(skill);
                     this.skills.push('burping');
@@ -28,7 +29,7 @@ define([
             }).out;
 
             const E = new Type('Expert').links(S).properties({
-                init: function(skill)
+                init(skill)
                 {
                     this._x = 7;
 
@@ -46,7 +47,7 @@ define([
 
         it("should be able be able to inherit from getter and setter functions", function() {
             const B = new Type('Beginner').properties({
-                init: function()
+                init()
                 {
                     this._x = 666;
 
@@ -67,8 +68,8 @@ define([
 
             }).out;
 
-            const E = Type('Specialist').links(S).properties({
-                init: function()
+            const E = Type('Expert').links(S).properties({
+                init()
                 {
                     return this._upper();
                 },
@@ -88,13 +89,60 @@ define([
             expect(s._x).to.deep.equal(888);
             expect(s.x).to.deep.equal(666);
         });
+
+        it("should be able be able to inherit from static methods", function() {
+            const B = new Type('Beginner').properties({
+                staticMethod()
+                {   "$attrs: static";
+
+                    return 'iamstatic'
+                }
+            }).out;
+
+            // make sure it is able to find properties higher up the prototype chain
+            const S = Type('Specialist').links(B).properties({
+
+            }).out;
+
+            const E = Type('Expert').links(S).properties({
+                staticMethod()
+                {   "$attrs: static";
+
+                    return this._upper()
+                }
+            }).out;
+
+            expect(E.staticMethod()).to.eql('iamstatic');
+        });
+    });
+
+    describe("Error on calling init when forgetting out", function() {
+        it("should output an error log in case one forgets to call out", function() {
+
+            function forgettingOut()
+            {
+                const B = new Type('Beginner').properties({
+                    init(skill)
+                    {
+                        this.skills = ['farting'];
+                        if(skill) {this.skills.push(skill)}
+
+                        return this
+                    }
+                });
+
+                let b = Object.create(B).init();
+            }
+
+            expect(forgettingOut).to.throw("Init not called from Type ctor. Call 'out' when creating a new Type to return the wrapped instance.");
+        });
     });
 
     describe("Attributes", function() {
 
         it("should log a warning in case of an unknown attribute.", function() {
             const B = new Type('Beginner').properties({
-                init: function() {
+                init() {
                 "@attrs: unknown1 !unknown2 unknown3=huh";
                 {
                     return this
@@ -108,23 +156,38 @@ define([
             expect(console.warn.calledWith("'unknown4' is an unknown attribute and will not be processed.")).to.be.true;
         });
 
-        it("should set the default descriptor settings: enumerable=false configurable=true writable=true", function() {
-            const B = new Type('Beginner').properties({
-                prop: 100
-            }).out;
+        describe("default descriptor properties", function() {
 
-            const dsc = Object.getOwnPropertyDescriptor(B, 'prop');
+            it("should set the default descriptor settings: enumerable=false configurable=true writable=true", function() {
+                const B = new Type('Beginner').properties({
+                    prop: 100
+                }).out;
 
-            expect(dsc.enumerable).to.be.false;
-            expect(dsc.configurable).to.be.true;
-            expect(dsc.writable).to.be.true;
+                const dsc = Object.getOwnPropertyDescriptor(B, 'prop');
+
+                expect(dsc.enumerable).to.be.false;
+                expect(dsc.configurable).to.be.true;
+                expect(dsc.writable).to.be.true;
+            });
+
+            it("should set the correct values if set as attributes", function() {
+                const B = new Type('Beginner').properties({
+                    prop: {[$attrs]: "enumerable !configurable !writable", value: 100}
+                }).out;
+
+                const dsc = Object.getOwnPropertyDescriptor(B, 'prop');
+
+                expect(dsc.enumerable).to.be.true;
+                expect(dsc.configurable).to.be.false;
+                expect(dsc.writable).to.be.false;
+            });
         });
 
         describe("static", function() {
 
             it("should add static properties to both the prototype as well as the constructor function", function() {
                 const B = new Type('Beginner').properties({
-                    method: function() {"@attrs: static";
+                    method() {"@attrs: static";
                         return 10
                     },
                     prop: {[$attrs]: 'static', value: 10}
@@ -138,7 +201,7 @@ define([
 
             it("should wrap static properties using getter/setters so we can change the value on the prototype from this", function() {
                 const B = new Type('Beginner').properties({
-                    method: function() {"@attrs: static";
+                    method() {"@attrs: static";
                         return 10
                     },
                     prop: {[$attrs]: 'static', value: 10}
@@ -173,7 +236,7 @@ define([
 
         it("should define aliases if the alias attribute is provided", function() {
             const B = new Type('Beginner').properties({
-                init: function() {"@attrs: alias=ctor|construct";
+                init() {"@attrs: alias=ctor|construct";
                     return 'alias'
                 },
             }).out;
@@ -202,7 +265,7 @@ define([
 
         it("should be possible to swap prototypes with breaking super/upper functionality", function() {
             const BA = new Type('BeginnerA').properties({
-                init: function(skill)
+                init(skill)
                 {
                     this.skills = ['farting'];
                     if(skill) {this.skills.push(skill)}
@@ -212,7 +275,7 @@ define([
             }).out;
 
             const BB = new Type('BeginnerB').properties({
-                init: function(skill)
+                init(skill)
                 {
                     this.skills = ['sneering'];
                     if(skill) {this.skills.push(skill)}
@@ -223,7 +286,7 @@ define([
 
             // allow for omitting the new keyword
             const S = Type('Specialist').links(BA).properties({
-                init: function(skill)
+                init(skill)
                 {
                     this._upper(skill);
                     this.skills.push('burping');
@@ -233,7 +296,7 @@ define([
             }).out;
 
             const E = new Type('Expert').links(S).properties({
-                init: function(skill)
+                init(skill)
                 {
                     this._x = 7;
 
@@ -255,7 +318,7 @@ define([
 
         it("should be possible to swap functions with breaking super/upper functionality", function() {
             const B = new Type('BeginnerA').properties({
-                init: function(skill)
+                init(skill)
                 {
                     this.skills = ['farting'];
                     if(skill) {this.skills.push(skill)}
@@ -266,7 +329,7 @@ define([
 
             // allow for omitting the new keyword
             const S = Type('Specialist').links(B).properties({
-                init: function(skill)
+                init(skill)
                 {
                     this._upper(skill);
                     this.skills.push('burping');
@@ -276,7 +339,7 @@ define([
             }).out;
 
             const E = new Type('Expert').links(S).properties({
-                init: function(skill)
+                init(skill)
                 {
                     this._x = 7;
 
@@ -300,6 +363,116 @@ define([
 
             expect(e.skills).to.eql(["sneering", "theFinger", "burping", "swearing"]);
             // TODO testcase for traits that should break methods using upper unless some kind of adopt method is implemented
+        });
+    });
+
+    describe("Validations", function() {
+
+        it("should throw an error in case of illegal private usage", function() {
+            function BType() {
+                const B = new Type('Beginner').properties({
+                    init () {
+                        return illegal._private
+                    }
+                }).out;
+            }
+
+            expect(BType).to.throw("[Type Beginner]: Illegal use of private property 'illegal._private' in (value) method 'init'.");
+        });
+
+        it("should give a warning in case of overrides without an override attribute or without using upper", function() {
+
+            const B = new Type('Beginner').properties({
+                validOverwriteMethod() {
+                    return 'something'
+                },
+                validOverwriteMethod2() {
+                    return 'something'
+                },
+                validOverwriteProp: 42,
+                warnOnThisOverrideMethod()
+                {
+
+                },
+                warnOnThisOverrideProperty: 42
+            }).out;
+
+            const S = Type('Specialist').links(B).properties({
+                validOverwriteMethod()
+                {
+                    return this._upper()
+                },
+                validOverwriteMethod2()
+                {   "@attrs: override";
+                    return 'random stuff'
+                },
+                validOverwriteProp: {[$attrs]: "override", value: 43},
+                warnOnThisOverrideMethod() {},
+                warnOnThisOverrideProperty: 43
+            }).out;
+
+            expect(console.warn.calledWith("[Type Specialist]: No overriding attribute and not calling upper in overriding (value) property 'warnOnThisOverrideMethod'.")).to.be.true;
+            expect(console.warn.calledWith("[Type Specialist]: No overriding attribute in overriding (value) property 'warnOnThisOverrideProperty'.")).to.be.true;
+        });
+
+        it("should throw an error in case of illegal this usage in static methods", function() {
+            function BType() {
+                const B = new Type('Beginner').properties({
+                    thisIsFine()
+                    {
+                        return this.illegalThis
+                    },
+                    illegalThis () { "@attrs: static";
+                        return this
+                    }
+                }).out;
+            }
+
+            expect(BType).to.throw("[Type Beginner]: Illegal this usage in static method 'illegalThis'.");
+        });
+
+        it("should throw an error in case of illegal use of non-static methods", function() {
+            function BType() {
+                const B = new Type('Beginner').properties({
+                    nonStatic1 () {
+                        return this
+                    },
+                    nonStatic2 () {
+                        return this
+                    },
+                    staticMethod()
+                    {   "@attrs: static";
+
+                        return 'stuff'
+                    },
+                    illegalNonStaticMethodCall()
+                    {   "@attrs: static";
+
+                        this.staticMethod(); // this is fine
+
+                        return this.nonStatic1() + this.nonStatic2(); // this should throw an error
+                    }
+                }).out;
+            }
+
+            expect(BType).to.throw("[Type Beginner]: Illegal this usage in static method 'illegalNonStaticMethodCall'.\n[Type Beginner]: Illegal usage of non-static methods 'this.nonStatic1,this.nonStatic2' in static method 'illegalNonStaticMethodCall'.");
+        });
+    });
+
+    describe("Statics method", function() {
+
+        it("should implement static properties is using the statics method without using a static attribute", function() {
+
+            const B = new Type('Beginner').statics({
+                staticMethod() {
+                    return 'staticMethod'
+                },
+                staticProperty: 42
+            }).out;
+
+            expect(B[$statics].staticProperty).to.eql(42);
+            expect(B[$statics].staticMethod).to.eql(B.staticMethod);
+            expect(B[$statics].staticMethod).to.eql(B.constructor.staticMethod);
         });
     });
 });
