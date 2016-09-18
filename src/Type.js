@@ -13,19 +13,13 @@
 }(this, function type() { "use strict";
 /*es6*//*? } else { write('export default Type\n\n') } *//*<3*/
 
-// int32 consts
-const ZERO  = 0|0;
-const ONE   = 1|0;
-const ATTRS = ['static', 'alias', 'override', 'enumerable', 'configurable', 'writable', 'const', 'readonly', 'frozen', 'sealed', 'extensible'];
-
-let   iid  = 0|0; // incremental counter for instance id's
-
+const ATTRS = ['static', 'alias', 'override', 'enumerable', 'configurable', 'writable', 'const', 'readonly', 'frozen', 'sealed', 'extensible', 'attached', 'solid'];
+// symbols
+const $type    = Symbol.for('cell-type');       // symbol for type data stored on the proto
 const $attrs   = Symbol.for('cell-type.attrs');
 const $statics = Symbol.for('cell-type.statics');
-const $owner   = Symbol.for('cell-type.owner'); // symbol to store the owner of a function/object so we can get the proper super.
+const $owner   = Symbol.for('cell-type.owner'); // symbol to store the owner of a function/object so we can get the proper dynamic super.
 const $inner   = Symbol.for('cell-type.inner'); // reference to the wrapped inner function
-const $type    = Symbol.for('cell-type');       // symbol for type data stored on the proto
-const $ctor    = Symbol('cell-type.ctor');      // local symbol for storing ctor call information on the options object
 
 const properties = {
     /**
@@ -35,7 +29,7 @@ const properties = {
 
      * @type Object
      */
-    info: {[$attrs]: "static", value: {
+    info: {[$attrs]: "static frozen solid", value: {
         "name"       : "cell-type",
         "description": "Prototypal inheritance algorithm supporting traits & dependency injection.",
         "version"    : "/*?= VERSION */",
@@ -45,7 +39,7 @@ const properties = {
         rgx: {
             upper:             /\bthis\._upper\b/,
             illegalPrivateUse: /\b(?!this)[\w\$]+\._[^_\.][\w\$]+\b/g,
-            thisUsage:         /\bthis(?!\.)\b/,
+            thisUsage:         /\bthis(?!\.)\b/,  // TODO don't match 'this' in string values
             thisMethodUsage:   /\bthis\.[\$\w]+\b/g,
         }
     }},
@@ -54,22 +48,21 @@ const properties = {
      * @desc
      *         Initializes the type.
      *
-     * @param  {string}  name    - name of the type.
-     * @param  {Object=} options - optional options object TODO implementation
+     * @param  {Object} model - The model for the type.
      *
-     * @return {Type} this
+     * @return {Object} The constructed prototype.
      */
-    // TODO check if name should be really mandatory
-    // TODO add properties based on model
-    init(name, options={})
-    {
-        if(!options[$ctor]) {throw new Error("Init not called from Type ctor. Call 'out' when creating a new Type to return the wrapped instance.")}
-        if(!name)           {throw new Error("Missing arg 'name' for Type.init.")}
+    init(model)
+    {   this._proto = null;
+        // optional not necessarily unique name for debugging purposes
+        this.name = model.name || '';
 
-        this.name  = name;
-        this._type = null;
-        
-        return this
+        if(model.links)      {this.links(model.links)}
+        if(model.inherits)   {this.inherits(model.inherits)}
+        if(model.statics)    {this.statics(model.statics)}
+        if(model.properties) {this.properties(model.properties)}
+
+        return this.proto
     },
     /**
      * @method Type.decorate
@@ -82,12 +75,14 @@ const properties = {
      * @returns {Object} The decorated object.
      */
     decorate(proto, type) {
-    "@attrs: static";
+    "<$attrs static>";
     {
         return Object.assign(proto, {
             constructor: function Type() {}, // TODO constructor support shizzle
             [$type]:     type, // store the Type model
-            [$statics]:  {_upper: null} // stores static wrapped properties so they don't pollute the prototype
+            [$statics]:  { // stores static wrapped properties so they don't pollute the prototype
+                _upper: null
+            }
         });
     }},
     /**
@@ -95,31 +90,22 @@ const properties = {
      * @desc   **aliases:** inherits
      * #
      *         links/inherits another object(prototype).
-     *         If one wants to use link/inherits it should be called as the first chained function.
+     *         In case no arguments are given, it will return the linked prototype.
      *
-     * @param {Object} obj - The object(prototype) to be linked.
+     * @param {Object=} proto - The object(prototype) to be linked.
      *
-     * @returns {Type} this
+     * @returns {Type|Object} this|linked prototype in case no arguments are given.
      */
-    links(obj) {
-    "@attrs: alias=inherits";
-    {
-        this.type = this.decorate(Object.create(obj), this);
+    links(proto=void 0) {
+    "<$attrs alias=inherits>";
+    {   if(proto === undefined) {return Reflect.getPrototypeOf(this.proto)}
+
+        this.proto = !this._proto
+            ? this.decorate(Object.create(proto), this)
+            : Reflect.setPrototypeOf(this.proto, proto); // try to avoid this as it is slow.
 
         return this
     }},
-    /**
-     * @name Type#out
-     * @desc
-     *       Outputs the created type object
-     *
-     * @readonly
-     * @type Object
-     */
-    get out()
-    {
-        return this.type;
-    },
     /**
      * @method Type#properties
      * @desc
@@ -131,59 +117,58 @@ const properties = {
      */
     properties(props)
     {
-        extend(this.type, props);
-
-        return this
-    },
-    /**
-     * @method Type#statics
-     * @desc
-     *         Defines statics properties. Allows one to omit the static attribute.
-     *
-     * @param {Object} props - Object containing the static properties.
-     *
-     * @returns {Type} this
-     */
-    statics(props)
-    {
-        extend(this.type, props, {static: true});
+        extend(this.proto, props);
 
         return this
     },
     /**
      * @name Type#type
      * @desc
-     *       Getter/setter for the internal type. So we can assure a proper type is always set.
+     *       Getter/setter for the internal type. So we can assure a proper proto is always returned.
      *
      * @type Object
      */
-    get type()
+    get proto()
     {
-        return this._type || (this._type = this.decorate({}, this)); // decorate a plain obj as type
+        return this._proto || (this._proto = this.decorate({}, this)); // decorate a plain obj as type
     },
-    set type(t)
+    set proto(p)
     {
-        this._type = t
+        this._proto = p
+    },
+    /**
+     * @method Type#statics
+     * @desc
+     *         Defines statics properties. Allows one to omit the static attribute.
+     *         Returns all static properties ($statics) in case no arguments are given.
+     *
+     * @param {Object} props - Object containing the static properties.
+     *
+     * @returns {Type|Object} this|object containing all static properties.
+     */
+    statics(props)
+    {   if(props === undefined) {return this.proto[$statics]}
+
+        extend(this.proto, props, {static: true});
+
+        return this
     }
 };
-
+// TODO check if maps are better to store $statics, $state etc.
 /**
  * @constructor Type
  * @desc
  *        Prototypal inheritance algorithm supporting traits & dependency injection.
  *
- * @param  {string}  name    - name of the type.
- * @param  {Object=} options - optional options object TODO implementation
+ * @param  {Object} model - The model for the type.
  *
- * @return {Type} new Type
+ * @return {Object} The constructed prototype.
  */
-function Type(name, options={})
-{
-    options[$ctor] = true; // register call from constructor
-    // allow for omitting the new keyword
+function Type(model)
+{   // allow for omitting the new keyword
     const self = Type.prototype.isPrototypeOf(this) ? this : Object.create(Type.prototype);
 
-    return self.init(name, options);
+    return self.init(model);
 }
 // TODO add _upper as a proper static property
 Type.prototype[$statics] = {_upper: null}; // object to store wrapped statics original versions.
@@ -211,10 +196,11 @@ function extend(obj, properties, options={})
         let addProp = function(obj, name) {if(symbol) {obj[Symbol[symbol]] = dsc.value} else {Reflect.defineProperty(obj, name, dsc)}};
 
         enhanceProperty(obj, prop, dsc);
-        validations(obj, prop, dsc);
 
         names.forEach(name => {addProp(obj, name); if(dsc.static) {addProp(obj.constructor, name)}});
     });
+
+    validate(obj, properties);
 
     return obj
 }
@@ -231,7 +217,7 @@ function extend(obj, properties, options={})
  */
 function processDescAttrs(dsc, options={})
 {
-    let tmp        = `${dsc.value || dsc.get || dsc.set}`.match(/@attrs:(.*?);/);
+    let tmp        = `${dsc.value || dsc.get || dsc.set}`.match(/<\$attrs(.*?)>/);
     let tmp2       = `${tmp? tmp[1] : dsc.value && dsc.value[$attrs] || ''}`.replace(/[\s]*([=\|\s])[\s]*/g, '$1'); // prettify: remove redundant white spaces
     let attributes = tmp2.match(/[!\$\w]+(=[\$\w]+(\|[\$\w]+)*)?/g)  || []; // filter attributes including values
 
@@ -244,14 +230,20 @@ function processDescAttrs(dsc, options={})
     return dsc
 }
 
-function validations(obj, prop, dsc)
+function validate(obj, properties)
 {
-    ['value', 'get', 'set'].forEach(method => {
-        if(!dsc.hasOwnProperty(method)) {return} // continue
+    let dsc;
 
-        validatePrivateUse(obj, prop, dsc, method);
-        validateStaticThisUsage(obj, prop, dsc, method);
-        validateOverrides(obj, prop, dsc, method);
+    Object.keys(properties).forEach(prop => {
+        dsc = Object.getOwnPropertyDescriptor(properties, prop);
+
+        ['value', 'get', 'set'].forEach(method => {
+            if(!dsc.hasOwnProperty(method)) {return} // continue
+
+            validatePrivateUse(obj, prop, dsc, method);
+            validateStaticThisUsage(obj, prop, dsc, method);
+            validateOverrides(obj, prop, dsc, method);
+        });
     });
 }
 
@@ -260,7 +252,7 @@ function validatePrivateUse(obj, prop, dsc, method)
 
     if(typeof(dsc[method]) !== 'function' || !matches) {return}
 
-    throw new Error(`[Type ${obj[$type].name}]: Illegal use of private propert${matches.length > 1 ? 'ies' : 'y'} '${matches}' in (${method}) method '${prop}'.`)
+    throw new Error(`[${obj[$type].name || 'Type'}]: Illegal use of private propert${matches.length > 1 ? 'ies' : 'y'} '${matches}' in (${method}) method '${prop}'.`)
 }
 
 function validateStaticThisUsage(obj, prop, dsc, method)
@@ -268,30 +260,29 @@ function validateStaticThisUsage(obj, prop, dsc, method)
     const thisUsage = properties.settings.value.rgx.thisUsage.test(dsc[method]);
     let   out       = '';
 
-    if(typeof(dsc[method]) !== 'function' || !dsc.static || (!thisUsage && !matches)) {return}
+    if(typeof(dsc[method]) !== 'function' || !obj[$statics].hasOwnProperty(prop) || (!thisUsage && !matches)) {return}
 
-    if(thisUsage) {out += `[Type ${obj[$type].name}]: Illegal this usage in static method '${prop}'.`}
+    if(thisUsage) {out += `[${obj[$type].name || 'Type'}]: Illegal this usage in static method '${prop}'.`}
     if(matches)   {
         const illegalNonStaticProperties = [];
 
         matches.forEach(prop => {if(!obj[$statics].hasOwnProperty(prop.slice(prop.indexOf('.')+1))) {illegalNonStaticProperties.push(prop)}});
 
-        if(illegalNonStaticProperties.length) {
-            if(out) {out += `\n`}
-            out += `[Type ${obj[$type].name}]: Illegal usage of non-static method${illegalNonStaticProperties.length > 1 ? 's' : ''} '${illegalNonStaticProperties}' in static method '${prop}'.`;
-        }
+        if(!illegalNonStaticProperties.length) {return}
+        if(out) {out += `\n`}
+        out += `[${obj[$type].name || 'Type'}]: Illegal usage of non-static method${illegalNonStaticProperties.length > 1 ? 's' : ''} '${illegalNonStaticProperties}' in static method '${prop}'.`;
     }
 
     throw new Error(out)
 }
 
 function validateOverrides(obj, prop, dsc, method)
-{   const isFunction      = dsc[method] instanceof Function;
-    const methodWithUpper = isFunction && properties.settings.value.rgx.upper.test(dsc[method]);
+{   const isFn            = dsc[method] instanceof Function;
+    const methodWithUpper = isFn && properties.settings.value.rgx.upper.test(dsc[method]);
 
     if(!(prop in Object.getPrototypeOf(obj)) || dsc.override || methodWithUpper) {return}
 
-    console.warn(`[Type ${obj[$type].name}]: No overriding attribute ${isFunction ? 'and not calling upper ' : ''}in overriding (${method}) property '${prop}'.`);
+    console.warn(`[${obj[$type].name || 'Type'}]: No overriding attribute ${isFn ? 'and not calling upper ' : ''}in overriding (${method}) property '${prop}'.`);
 }
 
 function assignAttrsToDsc(attributes, dsc)
@@ -311,7 +302,9 @@ function assignAttrsToDsc(attributes, dsc)
 
         dsc[attr] = value;
     }
-    if(dsc.readonly || dsc.const) {dsc.writable = false}
+
+    if(dsc.solid || dsc.readonly || dsc.const) {dsc.writable     = false}
+    if(dsc.solid || dsc.attached)              {dsc.configurable = false}
 }
 
 function enhanceProperty(obj, prop, dsc)

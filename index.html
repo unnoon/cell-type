@@ -10,18 +10,19 @@
         <script src="src/Type.js"></script>
         <!--<script src="test/prototypes/syntax.js"></script>-->
         <script>
+            const $type    = Symbol.for('cell-type');
+            const $attrs   = Symbol.for('cell-type.attrs');
+            const $statics = Symbol.for('cell-type.statics');
 
-            const B = new Type('Beginner').properties({
-                init(skill)
+            const B = new Type({name: 'Beginner', properties: {
+                thisIsFine()
                 {
-                    this.skills = ['farting'];
-                    if(skill) {this.skills.push(skill)}
-
+                    return this.illegalThis
+                },
+                illegalThis () { "<$attrs static>";
                     return this
                 }
-            });
-
-            let b = Object.create(B).init();
+            }});
 
             console.log('okay');
 
