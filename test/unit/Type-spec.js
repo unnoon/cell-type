@@ -504,27 +504,39 @@ define([
         it("should throw an error in case of illegal this usage in static methods", function() {
             function BType() {
                 const B = new Type({name: 'Beginner', properties: {
+                    staticMethod()
+                    { "<$attrs static>";
+
+                    }
+                }});
+
+                const S = Type({name: 'Specialist', links: B, properties: {
                     thisIsFine()
-                    {
-                        return this.illegalThis
-                    },
-                    illegalThis () { "<$attrs static>";
+                    {   "<$attrs static>";
+                        return this.staticMethod()
+                    }
+                }});
+
+                const E = Type({name: 'Expert', links: B, properties: {
+                    illegalThis()
+                    {   "<$attrs static>";
                         return this
                     }
                 }});
             }
 
-            expect(BType).to.throw("[Beginner]: Illegal this usage in static method 'illegalThis'.");
+            expect(BType).to.throw("[Expert]: Illegal this usage in static method 'illegalThis'.");
         });
 
         it("should output Type instead of the name in case none is given", function() {
             function BType() {
                 const B = new Type({properties: {
                     thisIsFine()
-                    {
+                    { "<$attrs static>";
                         return this.illegalThis
                     },
-                    illegalThis () { "<$attrs static>";
+                    illegalThis ()
+                    { "<$attrs static>";
                         return this
                     }
                 }});

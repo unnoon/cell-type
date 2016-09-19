@@ -154,7 +154,7 @@ const properties = {
         return this
     }
 };
-// TODO check if maps are better to store $statics, $state etc.
+
 /**
  * @constructor Type
  * @desc
@@ -261,12 +261,22 @@ function validateStaticThisUsage(obj, prop, dsc, method)
     let   out       = '';
 
     if(typeof(dsc[method]) !== 'function' || !obj[$statics].hasOwnProperty(prop) || (!thisUsage && !matches)) {return}
-
+    // TODO these should be 2 separate errors
     if(thisUsage) {out += `[${obj[$type].name || 'Type'}]: Illegal this usage in static method '${prop}'.`}
     if(matches)   {
         const illegalNonStaticProperties = [];
+        const protos = getPrototypesOf(obj); protos.unshift(obj);
+        let   method;
 
-        matches.forEach(prop => {if(!obj[$statics].hasOwnProperty(prop.slice(prop.indexOf('.')+1))) {illegalNonStaticProperties.push(prop)}});
+        for(let prop of matches) {
+            method = prop.slice(prop.indexOf('.')+1);
+
+            protoSearch : {
+                for(let proto of protos) {if(proto[$statics] && proto[$statics].hasOwnProperty(method)) {break protoSearch}}
+                // if not found as a static push illegal non-static property to the array
+                illegalNonStaticProperties.push(prop);
+            }
+        }
 
         if(!illegalNonStaticProperties.length) {return}
         if(out) {out += `\n`}
@@ -369,12 +379,18 @@ function upperEnhanceProperty(obj, prop, dsc, method)
 function getPropertyDescriptor(obj, prop) 
 {   if (obj.hasOwnProperty(prop)) {return Object.getOwnPropertyDescriptor(obj, prop)}
 
-    while (obj = Object.getPrototypeOf(obj))
-    {
-        if (obj.hasOwnProperty(prop)) {return Object.getOwnPropertyDescriptor(obj, prop)}
-    }
+    while (obj = Object.getPrototypeOf(obj)) {if(obj.hasOwnProperty(prop)) {return Object.getOwnPropertyDescriptor(obj, prop)}}
 
     return null
+}
+
+function getPrototypesOf(obj)
+{
+    let proto = obj, protos = [];
+
+    while (proto = Object.getPrototypeOf(proto)) {protos.push(proto)}
+
+    return protos
 }
 
 /*? if(MODULE_TYPE !== 'es6') {*/

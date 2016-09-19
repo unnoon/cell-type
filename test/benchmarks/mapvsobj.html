@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Benchbank test some shit</title>
+    <script src="../../bower_components/lodash/lodash.js"></script>
+    <script src="../../bower_components/benchmark/benchmark.js"></script>
+    <script>
+
+        var obj = {};
+
+        obj['-1']  = 666;
+        obj['666'] = 0;
+        obj['string'] = 'wut?';
+
+        var map = new Map();
+
+        map.set('-1', 666);
+        map.set('666', 0);
+        map.set('string', 'wut?');
+
+        var suite = new Benchmark.Suite;
+
+        // add tests
+        suite
+                .add('obj', function() {
+                    var get1 = obj['-1'];
+                    var get2 = obj['666'];
+                    var get3 = obj['string'];
+                })
+                .add('map', function() {
+                    var get1 = map.get('-1');
+                    var get2 = map.get('666');
+                    var get3 = map.get('string');
+                })
+                // add listeners
+                .on('cycle', function(event) {
+                    console.log(String(event.target));
+                })
+                .on('complete', function() {
+                    console.log('Fastest is ' + this.filter('fastest').map('name'));
+                })
+                // run async
+                .run({ 'async': true });
+    </script>
+</head>
+<body>
+</body>
+</html>

@@ -14,15 +14,22 @@
             const $attrs   = Symbol.for('cell-type.attrs');
             const $statics = Symbol.for('cell-type.statics');
 
+            /************************************************/
+
             const B = new Type({name: 'Beginner', properties: {
+                illegalThis () { "<$attrs static>";
+
+                }
+            }});
+
+            const S = Type({name: 'Specialist', links: B, properties: {
                 thisIsFine()
                 {
                     return this.illegalThis
-                },
-                illegalThis () { "<$attrs static>";
-                    return this
                 }
             }});
+
+            /************************************************/
 
             console.log('okay');
 
