@@ -17,13 +17,38 @@
             /************************************************/
 
             const B = Type({name: 'Beginner', properties: {
-                nonStatic1 () {
-                    return this
-                },
-                nonStatic2 () {
+                init(skill)
+                {
+                    this.skills = ['farting'];
+                    if(skill) {this.skills.push(skill)}
+
                     return this
                 }
             }});
+
+            const S = Type({name: 'Specialist', links: B, properties: {
+                init(skill)
+                {
+                    this._upper(skill);
+                    this.skills.push('burping');
+
+                    return this
+                }
+            }});
+            // using the new keyword is also possible
+            const E = new Type({name: 'Expert', links: S, properties: {
+                init(skill)
+                {
+                    this._x = 7;
+
+                    this._upper(skill);
+                    this.skills.push('swearing');
+
+                    return this
+                }
+            }});
+
+            const e = Object.create(E).init('theFinger');
 
             /************************************************/
 

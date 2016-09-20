@@ -5,6 +5,7 @@ define([
     const $type    = Symbol.for('cell-type');
     const $attrs   = Symbol.for('cell-type.attrs');
     const $statics = Symbol.for('cell-type.statics');
+    const $inner   = Symbol.for('cell-type.inner'); // reference to the wrapped inner function
 
     describe("inheritance principles", function() {
         it("should be able to use simple inheritance i.e. super/upper and proper context", function() {
@@ -116,6 +117,7 @@ define([
             }});
 
             expect(E.staticMethod()).to.eql('iamstatic');
+            expect(E[$statics].staticMethod).to.eql(E.staticMethod[$inner]);
         });
     });
 

@@ -147,13 +147,13 @@ const properties = {
      */
     _extend(obj, properties, options={})
     {
-        [...Object.keys(properties), ...Object.getOwnPropertySymbols(properties)].forEach(prop => {
+        [...Object.getOwnPropertySymbols(properties), ...Object.keys(properties)].forEach(prop => {
             let dsc     = this._processDescAttrs(Object.getOwnPropertyDescriptor(properties, prop), options);
             let names   = dsc.alias || []; names.unshift(prop);
 
             this._enhanceProperty(obj, prop, dsc);
 
-            names.forEach(name => Object.defineProperty(obj, name, dsc));
+            names.forEach(name => {Object.defineProperty(obj, name, dsc); if(dsc.static && obj.constructor) {Object.defineProperty(obj.constructor, name, dsc)}});
         });
 
         this._validate(obj, properties);
@@ -171,7 +171,8 @@ const properties = {
      * @returns {Object|null} - the property descriptor or null in case no descriptor is found.
      */
     $getPropertyDescriptor(obj, prop)
-    {   if(obj.hasOwnProperty(prop)) {return Object.getOwnPropertyDescriptor(obj, prop)}
+    {   "<$attrs static>";
+        if(obj.hasOwnProperty(prop)) {return Object.getOwnPropertyDescriptor(obj, prop)}
 
         while(obj = Object.getPrototypeOf(obj)) {if(obj.hasOwnProperty(prop)) {return Object.getOwnPropertyDescriptor(obj, prop)}}
 
@@ -187,7 +188,7 @@ const properties = {
      * @returns {Array} Array containing the prototype chain
      */
     $getPrototypesOf(obj)
-    {
+    {   "<$attrs static>";
         let proto = obj, protos = [];
 
         while(proto = Object.getPrototypeOf(proto)) {protos.push(proto)}
@@ -328,15 +329,17 @@ const properties = {
      */
     _upperEnhanceProperty(obj, prop, dsc, method)
     {
-        const fn = dsc[method];
+        const getPropertyDescriptor = Type.$getPropertyDescriptor;
+        const getPrototypeOf        = Reflect.getPrototypeOf;
+        const fn                    = dsc[method];
 
         efn[$owner] = obj;
         efn[$inner] = fn; // reference to retrieve the original function
 
         function efn(...args) {
             let tmp = this._upper, out;
-            // FIXME this is ugly
-            this._upper = (...args) => Type.prototype.$getPropertyDescriptor(Reflect.getPrototypeOf(efn[$owner]), prop)[method].apply(this, args); // dynamically get the upper method
+
+            this._upper = (...args) => getPropertyDescriptor(getPrototypeOf(efn[$owner]), prop)[method].apply(this, args); // dynamically get the upper method
             out = fn.apply(this, args);
             this._upper = tmp;
 
@@ -457,12 +460,14 @@ const properties = {
      * @returns {Error|undefined}
      */
     _validateStaticThisUsage(obj, prop, dsc, method)
-    {   const thisUsage = properties.settings.value.rgx.thisUsage.test(dsc[method]); // FIXME this is way to sensitive
+    {   // FIXME get rgx from local settings
+        const thisUsage = properties.settings.value.rgx.thisUsage.test(dsc[method]); // FIXME this is way to sensitive
 
         if(typeof(dsc[method]) !== 'function' || !obj[$statics].hasOwnProperty(prop) || !thisUsage) {return}
 
         throw new Error(`[${obj[$type].name || 'Type'}]: Illegal this usage in static method '${prop}'.`)
-    }
+    },
+    [$statics]: {}
 };
 
 /**
@@ -480,8 +485,6 @@ function Type(model)
 
     return self.init(model);
 }
-// TODO add _upper as a proper static property
-Type.prototype[$statics] = {_upper: null}; // object to store wrapped statics original versions.
 
 properties._extend(Type.prototype, properties);
 
