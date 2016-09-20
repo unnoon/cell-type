@@ -4,14 +4,9 @@
  * @license      {@link https://github.com/unnoon/cell-type/blob/master/LICENSE|MIT License}
  * @overview     Prototypal(OLOO) inheritance algorithm.
  */
-/*? if(MODULE_TYPE !== 'es6') {*/
-!function(root, type) {
-/* istanbul ignore next */ switch(true) {
-/*amd*/    case typeof(define) === 'function' && root.define === define && !!define.amd : define(type);                                                              break;
-/*node*/   case typeof(module) === 'object'   && root === module.exports                : module.exports = type();                                                   break;
-/*global*/ case !root.Type                                                              : Reflect.defineProperty(root, 'Type', {value: type(), enumerable: !0}); break; default : console.error("'Type' is already defined on root object")}
-}(this, function type() { "use strict";
-/*es6*//*? } else { write('export default Type\n\n') } *//*<3*/
+export default Type
+
+/*<3*/
 
 const ATTRS = ['static', 'alias', 'override', 'enumerable', 'configurable', 'writable', 'const', 'readonly', 'frozen', 'sealed', 'extensible', 'attached', 'solid', 'validate'];
 const RGX   = {
@@ -40,7 +35,7 @@ const properties = {
     $info: {[$attrs]: "static frozen solid", value: {
         "name"       : "cell-type",
         "description": "Prototypal(OLOO) inheritance algorithm.",
-        "version"    : "/*?= VERSION */",
+        "version"    : "0.0.0",
         "url"        : "https://github.com/unnoon/cell-type"
     }},
     /**
@@ -417,7 +412,7 @@ const properties = {
 
         for(let prop of matches) {
             let name = prop.slice(prop.indexOf('.')+1); // FIXME will probably break with symbols add a test case
-            if(!(props[name] && props[name].static)) protoSearch : 
+            if(!(props[name] && props[name].static)) protoSearch :
             {
                 for(let proto of protos) {if(proto[$statics] && proto[$statics].hasOwnProperty(name)) {break protoSearch}}
                 // if not found as a static push illegal non-static property to the array
@@ -518,8 +513,4 @@ function Type(model)
 
 properties._$extend(Type.prototype, properties);
 
-/*? if(MODULE_TYPE !== 'es6') {*/
-return Type
-});
-/*? } */
 
