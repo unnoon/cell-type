@@ -31,10 +31,9 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     var RGX = {
         upper: /\bthis\._upper\b/,
         illegalPrivateUse: /\b(?!this)[\w\$]+\._[^_\.][\w\$]+\b/g,
-        thisUsage: /\bthis(?!\.)\b/, // TODO don't match 'this' in string values
         thisMethodUsage: /\bthis\.[\$\w]+\b/g
     };
-    // TODO auto add static attribute based on $ prefix
+
     // symbols
     var $type = Symbol.for('cell-type'); // symbol for type data stored on the proto
     var $attrs = Symbol.for('cell-type.attrs');
@@ -232,13 +231,14 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
             var _this2 = this;
 
             var options = arguments.length <= 2 || arguments[2] === undefined ? {} : arguments[2];
+            var keys = [].concat(_toConsumableArray(Object.getOwnPropertySymbols(properties)), _toConsumableArray(Object.keys(properties)));
             var eprops = {};
 
-            [].concat(_toConsumableArray(Object.getOwnPropertySymbols(properties)), _toConsumableArray(Object.keys(properties))).forEach(function (prop) {
+            keys.forEach(function (prop) {
                 eprops[prop] = _this2._$processDescAttrs(prop, Object.getOwnPropertyDescriptor(properties, prop), options);
             });
 
-            [].concat(_toConsumableArray(Object.getOwnPropertySymbols(eprops)), _toConsumableArray(Object.keys(eprops))).forEach(function (prop) {
+            keys.forEach(function (prop) {
                 var dsc = eprops[prop];
                 var names = dsc.alias || [];names.unshift(prop);
 
@@ -246,7 +246,8 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
                 _this2._$enhanceProperty(obj, prop, dsc);
 
                 names.forEach(function (name) {
-                    Object.defineProperty(obj, name, dsc);if (dsc.static && obj.constructor) {
+                    Object.defineProperty(obj, name, dsc);
+                    if (dsc.static && obj.hasOwnProperty('constructor')) {
                         Object.defineProperty(obj.constructor, name, dsc);
                     }
                 });
@@ -263,7 +264,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
          * @param {Object} obj  - the object in the prototype chain.
          * @param {string} prop - the name of the property.
          *
-         * @returns {Object|null} - the property descriptor or null in case no descriptor is found.
+         * @returns {Object|undefined} - the property descriptor or null in case no descriptor is found.
          */
         $getPropertyDescriptor: function $getPropertyDescriptor(obj, prop) {
             "<$attrs static>";
@@ -277,8 +278,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
                     return Object.getOwnPropertyDescriptor(obj, prop);
                 }
             }
-
-            return null;
         },
 
         /**
@@ -522,7 +521,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
                 } // continue
 
                 _this4._$validatePrivateUse(obj, prop, dsc, method);
-                _this4._$validateStaticThisUsage(obj, prop, dsc, method);
                 _this4._$validateNonStaticMethodUsage(obj, prop, dsc, method, props);
                 _this4._$validateOverrides(obj, prop, dsc, method);
             });
@@ -533,6 +531,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
          * @method Type._$validateNonStaticMethodUsage
          * @desc
          *         Validates illegal use of non-static methods inside static methods.
+         *         Note that this method will not check any methods called by using the syntax obj[method|$ymbol].
          *
          * @param {Object}        obj    - Owner of the property that needs validation
          * @param {string|Symbol} prop   - Property that needs validation.
@@ -562,7 +561,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
                 for (var _iterator2 = matches[Symbol.iterator](), _step2; !(_iteratorNormalCompletion2 = (_step2 = _iterator2.next()).done); _iteratorNormalCompletion2 = true) {
                     var _prop = _step2.value;
 
-                    var name = _prop.slice(_prop.indexOf('.') + 1); // FIXME will probably break with symbols add a test case
+                    var name = _prop.slice(_prop.indexOf('.') + 1);
                     if (!(props[name] && props[name].static)) protoSearch: {
                         var _iteratorNormalCompletion3 = true;
                         var _didIteratorError3 = false;
@@ -663,31 +662,6 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
             }
 
             throw new Error('[' + (obj[$type].name || 'Type') + ']: Illegal use of private propert' + (matches.length > 1 ? 'ies' : 'y') + ' \'' + matches + '\' in (' + method + ') method \'' + prop + '\'.');
-        },
-
-        /**
-         * @private
-         * @method Type._$validateStaticThisUsage
-         * @desc
-         *         Validates illegal use of this in static functions.
-         *
-         * @param {Object}        obj    - Owner of the property that needs validation
-         * @param {string|Symbol} prop   - Property that needs validation.
-         * @param {Object}        dsc    - Property descriptor.
-         * @param {string}        method - Method that is evaluated value|get|set
-         *
-         * @returns {Error|undefined}
-         */
-        _$validateStaticThisUsage: function _$validateStaticThisUsage(obj, prop, dsc, method) {
-            "<$attrs static>";
-
-            var thisUsage = RGX.thisUsage.test(dsc[method]); // FIXME Way to sensitive
-
-            if (typeof dsc[method] !== 'function' || !dsc.static || !thisUsage) {
-                return;
-            }
-            // FIXME adopt error message
-            throw new Error('[' + (obj[$type].name || 'Type') + ']: Illegal self reference in static method \'' + prop + '\'.');
         }
     }, $statics, {});
 

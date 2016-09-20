@@ -12,10 +12,9 @@ const ATTRS = ['static', 'alias', 'override', 'enumerable', 'configurable', 'wri
 const RGX   = {
     upper:             /\bthis\._upper\b/,
     illegalPrivateUse: /\b(?!this)[\w\$]+\._[^_\.][\w\$]+\b/g,
-    thisUsage:         /\bthis(?!\.)\b/,  // TODO don't match 'this' in string values
     thisMethodUsage:   /\bthis\.[\$\w]+\b/g,
 };
-// TODO auto add static attribute based on $ prefix
+
 // symbols
 const $type    = Symbol.for('cell-type');       // symbol for type data stored on the proto
 const $attrs   = Symbol.for('cell-type.attrs');
@@ -153,20 +152,23 @@ const properties = {
     _$extend(obj, properties, options={})
     {   "<$attrs static>";
 
+        const keys   = [...Object.getOwnPropertySymbols(properties), ...Object.keys(properties)];
         const eprops = {};
 
-        [...Object.getOwnPropertySymbols(properties), ...Object.keys(properties)].forEach(prop => {
+        keys.forEach(prop => {
             eprops[prop] = this._$processDescAttrs(prop, Object.getOwnPropertyDescriptor(properties, prop), options);
         });
 
-        [...Object.getOwnPropertySymbols(eprops), ...Object.keys(eprops)].forEach(prop => {
+        keys.forEach(prop => {
             let dsc   = eprops[prop];
             let names = dsc.alias || []; names.unshift(prop);
 
             this._$validate(obj, prop, dsc, eprops);
             this._$enhanceProperty(obj, prop, dsc);
 
-            names.forEach(name => {Object.defineProperty(obj, name, dsc); if(dsc.static && obj.constructor) {Object.defineProperty(obj.constructor, name, dsc)}});
+            names.forEach(name => {
+                Object.defineProperty(obj, name, dsc);
+                if(dsc.static && obj.hasOwnProperty('constructor')) {Object.defineProperty(obj.constructor, name, dsc)}});
         });
 
         return obj
@@ -179,15 +181,13 @@ const properties = {
      * @param {Object} obj  - the object in the prototype chain.
      * @param {string} prop - the name of the property.
      *
-     * @returns {Object|null} - the property descriptor or null in case no descriptor is found.
+     * @returns {Object|undefined} - the property descriptor or null in case no descriptor is found.
      */
     $getPropertyDescriptor(obj, prop)
     {   "<$attrs static>";
         if(obj.hasOwnProperty(prop)) {return Object.getOwnPropertyDescriptor(obj, prop)}
 
         while(obj = Object.getPrototypeOf(obj)) {if(obj.hasOwnProperty(prop)) {return Object.getOwnPropertyDescriptor(obj, prop)}}
-
-        return null
     },
     /**
      * @method Type.$getPrototypesOf
@@ -382,7 +382,6 @@ const properties = {
             if(!dsc.hasOwnProperty(method)) {return} // continue
 
             this._$validatePrivateUse(obj, prop, dsc, method);
-            this._$validateStaticThisUsage(obj, prop, dsc, method);
             this._$validateNonStaticMethodUsage(obj, prop, dsc, method, props);
             this._$validateOverrides(obj, prop, dsc, method);
         });
@@ -392,6 +391,7 @@ const properties = {
      * @method Type._$validateNonStaticMethodUsage
      * @desc
      *         Validates illegal use of non-static methods inside static methods.
+     *         Note that this method will not check any methods called by using the syntax obj[method|$ymbol].
      *
      * @param {Object}        obj    - Owner of the property that needs validation
      * @param {string|Symbol} prop   - Property that needs validation.
@@ -411,7 +411,7 @@ const properties = {
         const protos = this.$getPrototypesOf(obj); protos.unshift(obj);
 
         for(let prop of matches) {
-            let name = prop.slice(prop.indexOf('.')+1); // FIXME will probably break with symbols add a test case
+            let name = prop.slice(prop.indexOf('.')+1);
             if(!(props[name] && props[name].static)) protoSearch :
             {
                 for(let proto of protos) {if(proto[$statics] && proto[$statics].hasOwnProperty(name)) {break protoSearch}}
@@ -464,27 +464,6 @@ const properties = {
         if(typeof(dsc[method]) !== 'function' || !matches) {return}
 
         throw new Error(`[${obj[$type].name || 'Type'}]: Illegal use of private propert${matches.length > 1 ? 'ies' : 'y'} '${matches}' in (${method}) method '${prop}'.`)
-    },
-    /**
-     * @private
-     * @method Type._$validateStaticThisUsage
-     * @desc
-     *         Validates illegal use of this in static functions.
-     *
-     * @param {Object}        obj    - Owner of the property that needs validation
-     * @param {string|Symbol} prop   - Property that needs validation.
-     * @param {Object}        dsc    - Property descriptor.
-     * @param {string}        method - Method that is evaluated value|get|set
-     *
-     * @returns {Error|undefined}
-     */
-    _$validateStaticThisUsage(obj, prop, dsc, method)
-    {   "<$attrs static>";
-        const thisUsage = RGX.thisUsage.test(dsc[method]); // FIXME Way to sensitive
-
-        if(typeof(dsc[method]) !== 'function' || !dsc.static || !thisUsage) {return}
-        // FIXME adopt error message
-        throw new Error(`[${obj[$type].name || 'Type'}]: Illegal self reference in static method '${prop}'.`)
     },
     /**
      * @name Type#[Symbol('cell-type.statics')]
