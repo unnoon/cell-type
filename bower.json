@@ -1,6 +1,6 @@
 {
   "name": "cell-type",
-  "description": "Fast JS Type implementation.",
+  "description": "Prototypal(OLOO) inheritance algorithm.",
   "main": "src/Type.js",
   "authors": [
     "Rogier Geertzema"
@@ -8,8 +8,10 @@
   "license": "MIT",
   "keywords": [
     "type",
-    "bag",
-    "fast"
+    "class",
+    "inheritance",
+    "prototypal",
+    "OLOO"
   ],
   "moduleType": [
     "amd",

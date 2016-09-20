@@ -521,7 +521,7 @@ define([
                 }});
             }
 
-            expect(BType).to.throw("[Expert]: Illegal this usage in static method 'illegalThis'.");
+            expect(BType).to.throw("[Expert]: Illegal self reference in static method 'illegalThis'.");
         });
 
         it("should output Type instead of the name in case none is given", function() {
@@ -538,7 +538,7 @@ define([
                 }});
             }
 
-            expect(BType).to.throw("[Type]: Illegal this usage in static method 'illegalThis'.");
+            expect(BType).to.throw("[Type]: Illegal self reference in static method 'illegalThis'.");
         });
 
         it("should throw an error in case of illegal use of non-static methods", function() {

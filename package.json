@@ -1,7 +1,7 @@
 {
   "name": "cell-type",
   "version": "0.0.0",
-  "description": "Prototypal inheritance algorithm supporting traits & dependency injection.",
+  "description": "Prototypal(OLOO) inheritance algorithm.",
   "main": "src/Type.js",
   "scripts": {
     "babel": "babel bin/Type.js -o bin/es5/Type.js",
@@ -23,9 +23,10 @@
   },
   "keywords": [
     "type",
-    "bag",
-    "bunch",
-    "fast"
+    "class",
+    "inheritance",
+    "prototypal",
+    "OLOO"
   ],
   "author": "Rogier Geertzema",
   "license": "MIT",
