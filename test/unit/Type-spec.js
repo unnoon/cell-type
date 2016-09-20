@@ -8,7 +8,7 @@ define([
 
     describe("inheritance principles", function() {
         it("should be able to use simple inheritance i.e. super/upper and proper context", function() {
-            const B = new Type({name: 'Beginner', properties: {
+            const B = Type({name: 'Beginner', properties: {
                 init(skill)
                 {
                     this.skills = ['farting'];
@@ -18,7 +18,6 @@ define([
                 }
             }});
 
-            // allow for omitting the new keyword
             const S = Type({name: 'Specialist', links: B, properties: {
                 init(skill)
                 {
@@ -28,7 +27,7 @@ define([
                     return this
                 }
             }});
-
+            // using the new keyword is also possible
             const E = new Type({name: 'Expert', links: S, properties: {
                 init(skill)
                 {
@@ -50,7 +49,7 @@ define([
         });
 
         it("should be able be able to inherit from getter and setter functions", function() {
-            const B = new Type({name: 'Beginner', properties: {
+            const B = Type({name: 'Beginner', properties: {
                 init()
                 {
                     this._x = 666;
@@ -95,7 +94,7 @@ define([
         });
 
         it("should be able be able to inherit from static methods", function() {
-            const B = new Type({name: 'Beginner', properties: {
+            const B = Type({name: 'Beginner', properties: {
                 staticMethod()
                 {   "<$attrs static>";
 
@@ -123,7 +122,7 @@ define([
     describe("Attributes", function() {
 
         it("should log a warning in case of an unknown attribute.", function() {
-            const B = new Type({name: 'Beginner', properties: {
+            const B = Type({name: 'Beginner', properties: {
                 init() {
                 "<$attrs unknown1 !unknown2 unknown3=huh>";
                 {
@@ -141,7 +140,7 @@ define([
         describe("default descriptor properties", function() {
 
             it("should set the default descriptor settings: enumerable=false configurable=true writable=true", function() {
-                const B = new Type({name: 'Beginner', properties: {
+                const B = Type({name: 'Beginner', properties: {
                     prop: 100
                 }});
 
@@ -153,7 +152,7 @@ define([
             });
 
             it("should set the correct values if set as attributes", function() {
-                const B = new Type({name: 'Beginner', properties: {
+                const B = Type({name: 'Beginner', properties: {
                     prop: {[$attrs]: "enumerable !configurable !writable", value: 100}
                 }});
 
@@ -165,7 +164,7 @@ define([
             });
 
             it("should set correct values for attached & solid", function() {
-                const B = new Type({name: 'Beginner', properties: {
+                const B = Type({name: 'Beginner', properties: {
                     solidProp: {[$attrs]: "solid", value: 100},
                     attachedProp: {[$attrs]: "attached", value: 200}
                 }});
@@ -182,8 +181,8 @@ define([
 
         describe("static", function() {
 
-            it("should add static properties to both the prototype as well as the constructor function", function() {
-                const B = new Type({name: 'Beginner', properties: {
+            it("should add static properties to the prototype", function() {
+                const B = Type({name: 'Beginner', properties: {
                     method() {"<$attrs static>";
                         return 10
                     },
@@ -192,12 +191,10 @@ define([
 
                 expect(B.method()).to.eql(10);
                 expect(B.prop).to.eql(10);
-                expect(B.constructor.method()).to.eql(10);
-                expect(B.constructor.prop).to.eql(10);
             });
 
             it("should wrap static properties using getter/setters so we can change the value on the prototype from this", function() {
-                const B = new Type({name: 'Beginner', properties: {
+                const B = Type({name: 'Beginner', properties: {
                     method() {"<$attrs static>";
                         return 10
                     },
@@ -213,7 +210,7 @@ define([
             });
 
             it("should wrap static set method to a warning message in case it contains !writable, readonly or const", function() {
-                const B = new Type({name: 'Beginner', properties: {
+                const B = Type({name: 'Beginner', properties: {
                     prop1: {[$attrs]: 'static !writable', value: 10},
                     prop2: {[$attrs]: 'static readonly',  value: 10},
                     prop3: {[$attrs]: 'static const',     value: 10}
@@ -232,7 +229,7 @@ define([
         });
 
         it("should define aliases if the alias attribute is provided", function() {
-            const B = new Type({name: 'Beginner', properties: {
+            const B = Type({name: 'Beginner', properties: {
                 init() {"<$attrs alias=ctor|construct>";
                     return 'alias'
                 },
@@ -246,7 +243,7 @@ define([
         });
 
         it("should set frozen, sealed, extensible from attributes on the designated obj", function() {
-            const B = new Type({name: 'Beginner', properties: {
+            const B = Type({name: 'Beginner', properties: {
                 frozen:          {[$attrs]: "frozen", value: {}},
                 sealed:          {[$attrs]: "sealed", value: {}},
                 ['!extensible']: {[$attrs]: "!extensible", value: {}},
@@ -261,7 +258,7 @@ define([
     describe("Prototype/function swapping", function() {
 
         it("should be possible to swap prototypes with breaking super/upper functionality", function() {
-            const BA = new Type({name: 'BeginnerA', properties: {
+            const BA = Type({name: 'BeginnerA', properties: {
                 init(skill)
                 {
                     this.skills = ['farting'];
@@ -271,7 +268,7 @@ define([
                 }
             }});
 
-            const BB = new Type({name: 'BeginnerB', properties: {
+            const BB = Type({name: 'BeginnerB', properties: {
                 init(skill)
                 {
                     this.skills = ['sneering'];
@@ -281,7 +278,6 @@ define([
                 }
             }});
 
-            // allow for omitting the new keyword
             const S = Type({name: 'Specialist', links: BA, properties: {
                 init(skill)
                 {
@@ -292,7 +288,7 @@ define([
                 }
             }});
 
-            const E = new Type({name: 'Expert', links: S, properties: {
+            const E = Type({name: 'Expert', links: S, properties: {
                 init(skill)
                 {
                     this._x = 7;
@@ -314,7 +310,7 @@ define([
         });
 
         it("should be possible to swap functions with breaking super/upper functionality", function() {
-            const B = new Type({name: 'BeginnerA', properties: {
+            const B = Type({name: 'BeginnerA', properties: {
                 init(skill)
                 {
                     this.skills = ['farting'];
@@ -324,7 +320,6 @@ define([
                 }
             }});
 
-            // allow for omitting the new keyword
             const S = Type({name: 'Specialist', links: B, properties: {
                 init(skill)
                 {
@@ -335,7 +330,7 @@ define([
                 }
             }});
 
-            const E = new Type({name: 'Expert', links: S, properties: {
+            const E = Type({name: 'Expert', links: S, properties: {
                 init(skill)
                 {
                     this._x = 7;
@@ -366,7 +361,7 @@ define([
     describe("links/inherits", function() {
 
         it("should be able to use the alias inherits instead of links", function() {
-            const B = new Type({name: 'Beginner', properties: {
+            const B = Type({name: 'Beginner', properties: {
                 staticMethod()
                 {   "<$attrs static>";
 
@@ -383,7 +378,7 @@ define([
         });
 
         it("should be possible to swap prototypes using the links method", function() {
-            const BA = new Type({name: 'BeginnerA', properties: {
+            const BA = Type({name: 'BeginnerA', properties: {
                 init(skill)
                 {
                     this.skills = ['farting'];
@@ -393,7 +388,7 @@ define([
                 }
             }});
 
-            const BB = new Type({name: 'BeginnerB', properties: {
+            const BB = Type({name: 'BeginnerB', properties: {
                 init(skill)
                 {
                     this.skills = ['sneering'];
@@ -403,7 +398,6 @@ define([
                 }
             }});
 
-            // allow for omitting the new keyword
             const S = Type({name: 'Specialist', links: BA, properties: {
                 init(skill)
                 {
@@ -414,7 +408,7 @@ define([
                 }
             }});
 
-            const E = new Type({name: 'Expert', links: S, properties: {
+            const E = Type({name: 'Expert', links: S, properties: {
                 init(skill)
                 {
                     this._x = 7;
@@ -434,7 +428,7 @@ define([
         });
 
         it("should return the linked prototype in case no arguments are given to links/inherits", function() {
-            const B = new Type({name: 'Beginner', properties: {
+            const B = Type({name: 'Beginner', properties: {
                 staticMethod()
                 {   "<$attrs static>";
 
@@ -456,7 +450,7 @@ define([
 
         it("should throw an error in case of illegal private usage", function() {
             function BType() {
-                const B = new Type({name: 'Beginner', properties: {
+                const B = Type({name: 'Beginner', properties: {
                     init () {
                         return illegal._private
                     }
@@ -468,7 +462,7 @@ define([
 
         it("should give a warning in case of overrides without an override attribute or without using upper", function() {
 
-            const B = new Type({name: 'Beginner', properties: {
+            const B = Type({name: 'Beginner', properties: {
                 validOverwriteMethod() {
                     return 'something'
                 },
@@ -503,7 +497,7 @@ define([
 
         it("should throw an error in case of illegal this usage in static methods", function() {
             function BType() {
-                const B = new Type({name: 'Beginner', properties: {
+                const B = Type({name: 'Beginner', properties: {
                     staticMethod()
                     { "<$attrs static>";
 
@@ -530,7 +524,7 @@ define([
 
         it("should output Type instead of the name in case none is given", function() {
             function BType() {
-                const B = new Type({properties: {
+                const B = Type({properties: {
                     thisIsFine()
                     { "<$attrs static>";
                         return this.illegalThis
@@ -547,7 +541,7 @@ define([
 
         it("should throw an error in case of illegal use of non-static methods", function() {
             function BType() {
-                const B = new Type({name: 'Beginner', properties: {
+                const B = Type({name: 'Beginner', properties: {
                     nonStatic1 () {
                         return this
                     },
@@ -557,9 +551,9 @@ define([
                     illegalNonStaticMethodCall()
                     {   "<$attrs static>";
 
-                        this.staticMethod(); // this is fine
+                        this.staticMethod(); // is fine
 
-                        return this.nonStatic1() + this.nonStatic2(); // this should throw an error
+                        return this.nonStatic1() + this.nonStatic2(); // should throw an error
                     },
                     staticMethod()
                     {   "<$attrs static>";
@@ -569,7 +563,7 @@ define([
                 }});
             }
 
-            expect(BType).to.throw("[Beginner]: Illegal this usage in static method 'illegalNonStaticMethodCall'.\n[Beginner]: Illegal usage of non-static methods 'this.nonStatic1,this.nonStatic2' in static method 'illegalNonStaticMethodCall'.");
+            expect(BType).to.throw("[Beginner]: Illegal usage of non-static methods 'this.nonStatic1,this.nonStatic2' in static method 'illegalNonStaticMethodCall'.");
         });
     });
 
@@ -577,7 +571,7 @@ define([
 
         it("should implement static properties is using the statics property without using a static attribute", function() {
 
-            const B = new Type({name: 'Beginner', statics: {
+            const B = Type({name: 'Beginner', statics: {
                 staticMethod() {
                     return 'staticMethod'
                 },
@@ -586,12 +580,11 @@ define([
 
             expect(B[$statics].staticProperty).to.eql(42);
             expect(B[$statics].staticMethod).to.eql(B.staticMethod);
-            expect(B[$statics].staticMethod).to.eql(B.constructor.staticMethod);
         });
 
         it("should be able to add static methods later on using the statics method", function() {
 
-            const B = new Type({name: 'Beginner'});
+            const B = Type({name: 'Beginner'});
 
             B[$type].statics({
                 staticMethod() {
@@ -602,16 +595,89 @@ define([
 
             expect(B[$statics].staticProperty).to.eql(42);
             expect(B[$statics].staticMethod).to.eql(B.staticMethod);
-            expect(B[$statics].staticMethod).to.eql(B.constructor.staticMethod);
         });
 
         it("should pass the statics properties in case the statics method is given no arguments", function() {
 
-            const B = new Type({name: 'Beginner'});
+            const B = Type({name: 'Beginner'});
 
             let statics = B[$type].statics();
 
             expect(B[$statics]).to.eql(statics);
+        });
+    });
+
+    describe("simple symbol test", function() {
+        var $init  = Symbol('init');
+        var $prop  = Symbol('prop');
+        var $$prop = Symbol('$prop');
+
+        it("should be able use symbols as keys and use attributes such as static", function() {
+            const B = Type({name: 'Beginner', properties: {
+                [$init](skill)
+                {
+                    this.skills = ['farting'];
+                    if(skill) {this.skills.push(skill)}
+
+                    return this
+                },
+                [$prop]: 42,
+                [$$prop]: {[$attrs]: 'static', value: 43}
+            }});
+
+            const b = Object.create(B)[$init]('theFinger');
+
+            expect(b.skills).to.eql(["farting", "theFinger"]);
+            expect(b[$prop]).to.eql(42);
+            expect(b[$$prop]).to.eql(43);
+            b[$$prop] = 44;
+            expect(b[$$prop]).to.eql(44);
+            expect(b[$statics][$$prop]).to.eql(44);
+        });
+    });
+
+    describe("inheritance principles with symbols", function() {
+        var $init = Symbol('init');
+
+        it("should be able to use simple inheritance i.e. super/upper and proper context", function() {
+            const B = Type({name: 'Beginner', properties: {
+                [$init](skill)
+                {
+                    this.skills = ['farting'];
+                    if(skill) {this.skills.push(skill)}
+
+                    return this
+                }
+            }});
+
+            const S = Type({name: 'Specialist', links: B, properties: {
+                [$init](skill)
+                {
+                    this._upper(skill);
+                    this.skills.push('burping');
+
+                    return this
+                }
+            }});
+
+            const E = Type({name: 'Expert', links: S, properties: {
+                [$init](skill)
+                {
+                    this._x = 7;
+
+                    this._upper(skill);
+                    this.skills.push('swearing');
+
+                    return this
+                }
+            }});
+
+            const e = Object.create(E)[$init]('theFinger');
+
+            expect(e.skills).to.eql(["farting", "theFinger", "burping", "swearing"]);
+            expect(B.isPrototypeOf(e)).to.be.true;
+            expect(S.isPrototypeOf(e)).to.be.true;
+            expect(E.isPrototypeOf(e)).to.be.true;
         });
     });
 });

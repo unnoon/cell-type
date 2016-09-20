@@ -16,16 +16,12 @@
 
             /************************************************/
 
-            const B = new Type({name: 'Beginner', properties: {
-                illegalThis () { "<$attrs static>";
-
-                }
-            }});
-
-            const S = Type({name: 'Specialist', links: B, properties: {
-                thisIsFine()
-                {
-                    return this.illegalThis
+            const B = Type({name: 'Beginner', properties: {
+                nonStatic1 () {
+                    return this
+                },
+                nonStatic2 () {
+                    return this
                 }
             }});
 
