@@ -38,7 +38,7 @@ const properties = {
     $info: {[$attrs]: "static frozen solid", value: {
         "name"       : "cell-type",
         "description": "Prototypal(OLOO) inheritance algorithm.",
-        "version"    : "0.0.0",
+        "version"    : "0.0.1",
         "url"        : "https://github.com/unnoon/cell-type"
     }},
     /**

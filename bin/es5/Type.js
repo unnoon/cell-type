@@ -53,7 +53,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         $info: (_$info = {}, _defineProperty(_$info, $attrs, "static frozen solid"), _defineProperty(_$info, 'value', {
             "name": "cell-type",
             "description": "Prototypal(OLOO) inheritance algorithm.",
-            "version": "0.0.0",
+            "version": "0.0.1",
             "url": "https://github.com/unnoon/cell-type"
         }), _$info),
         /**
