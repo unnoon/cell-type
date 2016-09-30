@@ -21,6 +21,7 @@ const $attrs   = Symbol.for('cell-type.attrs');
 const $statics = Symbol.for('cell-type.statics');
 const $owner   = Symbol.for('cell-type.owner'); // symbol to store the owner of a method so we can get the proper dynamic super.
 const $inner   = Symbol.for('cell-type.inner'); // reference to the wrapped inner function
+const $dsc     = Symbol.for('cell-type.dsc');   // symbol to tag an object as a cell-type descriptor
 
 const properties = {
     /**
@@ -31,7 +32,7 @@ const properties = {
      *
      * @type Object
      */
-    $info: {[$attrs]: "static frozen solid", value: {
+    $info: {[$attrs]: 'static frozen solid', value: {
         "name"       : "cell-type",
         "description": "Prototypal(OLOO) inheritance algorithm.",
         "version"    : "0.0.1",
@@ -42,21 +43,27 @@ const properties = {
      * @desc
      *         Initializes the type.
      *
-     * @param  {Object} model - The model for the type.
+     * @param  {Object} data - The data for the type.
      *
      * @return {Object} The constructed prototype.
      */
-    init(model)
+    init(data)
     {   this._proto = null;
         // optional not necessarily unique name for debugging purposes
-        this.name = model.name || '';
+        this.name  = data.name || '';
+        this.model = {}; // Where the key is the name|symbol and the value an extended descriptor including additional attributes.
 
-        if(model.links)      {this.links(model.links)}
-        if(model.inherits)   {this.inherits(model.inherits)}
-        if(model.statics)    {this.statics(model.statics)}
-        if(model.properties) {this.properties(model.properties)}
+        this.add(data);
 
         return this.proto
+    },
+    add(data)
+    {
+        if(data.links)      {this.links(data.links)}
+        if(data.inherits)   {this.inherits(data.inherits)}
+        if(data.compose)    {this.compose(...data.compose)}
+        if(data.statics)    {this.statics(data.statics)}
+        if(data.properties) {this.properties(data.properties)}
     },
     /**
      * @name Type.$attrs
@@ -65,7 +72,7 @@ const properties = {
      *
      * @type Array
      */
-    $attrs: {[$attrs]: "static", value: {ATTRS}},
+    $attrs: {[$attrs]: 'static', value: ATTRS},
     /**
      * @private
      * @method Type._$assignAttrsToDsc
@@ -75,8 +82,10 @@ const properties = {
      */
     _$assignAttrsToDsc(attributes, dsc)
     {   "<$attrs static>";
-        dsc.enumerable = false; // default set enumerable to false
+        // defaults
+        dsc.enumerable = dsc.static ? true : false;
         dsc.validate   = true;
+        dsc[$dsc]      = true;
 
         for(let attr of attributes)
         {   let value;
@@ -130,7 +139,7 @@ const properties = {
         ['value', 'get', 'set'].forEach(method => {
             if(!dsc.hasOwnProperty(method)) {return} // continue
 
-            if(dsc.static && 'value' in dsc) {this._$staticEnhanceProperty(obj, prop, dsc, method)}
+            if(dsc.static && 'value' in dsc) {this._$staticEnhance(obj, prop, dsc, method)}
             if(RGX.upper.test(dsc[method]))  {this._$upperEnhanceProperty(obj, prop, dsc, method)}
             if(dsc.extensible === false)     {Object.preventExtensions(dsc[method])}
             if(dsc.sealed)                   {Object.seal(dsc[method])}
@@ -152,23 +161,23 @@ const properties = {
     _$extend(obj, properties, options={})
     {   "<$attrs static>";
 
-        const keys   = [...Object.getOwnPropertySymbols(properties), ...Object.keys(properties)];
-        const eprops = {};
+        const keys = [...Object.getOwnPropertySymbols(properties), ...Object.keys(properties)];
 
         keys.forEach(prop => {
-            eprops[prop] = this._$processDescAttrs(prop, Object.getOwnPropertyDescriptor(properties, prop), options);
+            obj[$type].model[prop] = this._$processDescAttrs(prop, Object.getOwnPropertyDescriptor(properties, prop), options);
         });
 
         keys.forEach(prop => {
-            let dsc   = eprops[prop];
+            let dsc   = obj[$type].model[prop];
             let names = dsc.alias || []; names.unshift(prop);
 
-            this._$validate(obj, prop, dsc, eprops);
+            this._$validate(obj, prop, dsc, obj[$type].model);
             this._$enhanceProperty(obj, prop, dsc);
 
             names.forEach(name => {
                 Object.defineProperty(obj, name, dsc);
-                if(dsc.static && obj.hasOwnProperty('constructor')) {Object.defineProperty(obj.constructor, name, dsc)}});
+                if(dsc.static && obj.hasOwnProperty('constructor')) {Object.defineProperty(obj.constructor, name, dsc)}
+            });
         });
 
         return obj
@@ -241,11 +250,12 @@ const properties = {
      */
     _$processDescAttrs(prop, dsc, options={})
     {   "<$attrs static>";
+        if(dsc.value && dsc.value[$dsc]) {return dsc.value} // value is already a cell-type.dsc so no further processing needed
+
         let tmp        = `${dsc.value || dsc.get || dsc.set}`.match(/<\$attrs(.*?)>/);
         let tmp2       = `${tmp? tmp[1] : dsc.value && dsc.value[$attrs] || ''}`.replace(/[\s]*([=\|\s])[\s]*/g, '$1'); // prettify: remove redundant white spaces
         let attributes = tmp2.match(/[!\$\w]+(=[\$\w]+(\|[\$\w]+)*)?/g)  || []; // filter attributes including values
 
-        dsc.prop = prop;
         this._$assignAttrsToDsc(attributes, dsc);
         Object.assign(dsc, options);
 
@@ -287,7 +297,7 @@ const properties = {
     },
     /**
      * @private
-     * @method Type._$staticEnhanceProperty
+     * @method Type._$staticEnhance
      * @desc
      *         Static Enhances a property. It will wrap properties into a getter/setter so one is able to set static values from this.
      *         In case of a readonly property a warning is given on a set.
@@ -298,11 +308,15 @@ const properties = {
      * @param {Object}        dsc     - The property descriptor.
      * @param {string}        method  - The method that is currently processed value|get|set.
      */
-    _$staticEnhanceProperty(obj, prop, dsc, method)
+    _$staticEnhance(obj, prop, dsc, method)
     {   "<$attrs static>";
         Reflect.defineProperty(obj[$statics], prop, dsc); // add the original property to the special statics symbol
 
         if(dsc[method] instanceof Function) {return} // no further processing for static methods
+        else                                {this._$staticEnhanceProperty(obj, prop, dsc)}
+    },
+    _$staticEnhanceProperty(obj, prop, dsc)
+    {   "<$attrs static>";
 
         eget[$owner] = eset[$owner] = obj;
 
@@ -329,6 +343,20 @@ const properties = {
     {   if(props === undefined) {return this.proto[$statics]}
 
         this._$extend(this.proto, props, {static: true});
+
+        return this
+    },
+    /**
+     * @method Type#compose
+     * @desc   **aliases:** with, mixin
+     *
+     * @param {...Object} protos
+     *
+     * returns {Type} this
+     */
+    compose(...protos)
+    {
+        protos.forEach(proto => this.properties(proto[$type].model));
 
         return this
     },
@@ -466,18 +494,18 @@ const properties = {
         throw new Error(`[${obj[$type].name || 'Type'}]: Illegal use of private propert${matches.length > 1 ? 'ies' : 'y'} '${matches}' in (${method}) method '${prop}'.`)
     },
     /**
-     * @name Type#[Symbol('cell-type.statics')]
+     * @name Type.[Symbol('cell-type.statics')]
      * @type Object
      * @desc
      *       Object hidden behind a symbol to store all original statics.
      */
-    [$statics]: {}
+    [$statics]: {},
 };
 
 /**
  * @constructor Type
  * @desc
- *        Prototypal inheritance algorithm supporting traits & dependency injection.
+ *        Prototypal(OLOO) inheritance algorithm.
  *
  * @param  {Object} model - The model for the type.
  *
@@ -489,7 +517,10 @@ function Type(model)
 
     return self.init(model);
 }
-
+Type.prototype[$type] = { // fake type instance
+    name: 'Type',
+    model: {}
+};
 properties._$extend(Type.prototype, properties);
 
 

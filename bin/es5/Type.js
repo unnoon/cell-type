@@ -40,6 +40,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     var $statics = Symbol.for('cell-type.statics');
     var $owner = Symbol.for('cell-type.owner'); // symbol to store the owner of a method so we can get the proper dynamic super.
     var $inner = Symbol.for('cell-type.inner'); // reference to the wrapped inner function
+    var $dsc = Symbol.for('cell-type.dsc'); // symbol to tag an object as a cell-type descriptor
 
     var properties = _defineProperty({
         /**
@@ -50,7 +51,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
          *
          * @type Object
          */
-        $info: (_$info = {}, _defineProperty(_$info, $attrs, "static frozen solid"), _defineProperty(_$info, 'value', {
+        $info: (_$info = {}, _defineProperty(_$info, $attrs, 'static frozen solid'), _defineProperty(_$info, 'value', {
             "name": "cell-type",
             "description": "Prototypal(OLOO) inheritance algorithm.",
             "version": "0.0.1",
@@ -61,29 +62,36 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
          * @desc
          *         Initializes the type.
          *
-         * @param  {Object} model - The model for the type.
+         * @param  {Object} data - The data for the type.
          *
          * @return {Object} The constructed prototype.
          */
-        init: function init(model) {
+        init: function init(data) {
             this._proto = null;
             // optional not necessarily unique name for debugging purposes
-            this.name = model.name || '';
+            this.name = data.name || '';
+            this.model = {}; // Where the key is the name|symbol and the value an extended descriptor including additional attributes.
 
-            if (model.links) {
-                this.links(model.links);
-            }
-            if (model.inherits) {
-                this.inherits(model.inherits);
-            }
-            if (model.statics) {
-                this.statics(model.statics);
-            }
-            if (model.properties) {
-                this.properties(model.properties);
-            }
+            this.add(data);
 
             return this.proto;
+        },
+        add: function add(data) {
+            if (data.links) {
+                this.links(data.links);
+            }
+            if (data.inherits) {
+                this.inherits(data.inherits);
+            }
+            if (data.compose) {
+                this.compose.apply(this, _toConsumableArray(data.compose));
+            }
+            if (data.statics) {
+                this.statics(data.statics);
+            }
+            if (data.properties) {
+                this.properties(data.properties);
+            }
         },
 
         /**
@@ -93,7 +101,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
          *
          * @type Array
          */
-        $attrs: (_$attrs = {}, _defineProperty(_$attrs, $attrs, "static"), _defineProperty(_$attrs, 'value', { ATTRS: ATTRS }), _$attrs),
+        $attrs: (_$attrs = {}, _defineProperty(_$attrs, $attrs, 'static'), _defineProperty(_$attrs, 'value', ATTRS), _$attrs),
         /**
          * @private
          * @method Type._$assignAttrsToDsc
@@ -103,9 +111,11 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
          */
         _$assignAttrsToDsc: function _$assignAttrsToDsc(attributes, dsc) {
             "<$attrs static>";
+            // defaults
 
-            dsc.enumerable = false; // default set enumerable to false
+            dsc.enumerable = dsc.static ? true : false;
             dsc.validate = true;
+            dsc[$dsc] = true;
 
             var _iteratorNormalCompletion = true;
             var _didIteratorError = false;
@@ -196,7 +206,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
                 } // continue
 
                 if (dsc.static && 'value' in dsc) {
-                    _this._$staticEnhanceProperty(obj, prop, dsc, method);
+                    _this._$staticEnhance(obj, prop, dsc, method);
                 }
                 if (RGX.upper.test(dsc[method])) {
                     _this._$upperEnhanceProperty(obj, prop, dsc, method);
@@ -232,17 +242,16 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
             var options = arguments.length <= 2 || arguments[2] === undefined ? {} : arguments[2];
             var keys = [].concat(_toConsumableArray(Object.getOwnPropertySymbols(properties)), _toConsumableArray(Object.keys(properties)));
-            var eprops = {};
 
             keys.forEach(function (prop) {
-                eprops[prop] = _this2._$processDescAttrs(prop, Object.getOwnPropertyDescriptor(properties, prop), options);
+                obj[$type].model[prop] = _this2._$processDescAttrs(prop, Object.getOwnPropertyDescriptor(properties, prop), options);
             });
 
             keys.forEach(function (prop) {
-                var dsc = eprops[prop];
+                var dsc = obj[$type].model[prop];
                 var names = dsc.alias || [];names.unshift(prop);
 
-                _this2._$validate(obj, prop, dsc, eprops);
+                _this2._$validate(obj, prop, dsc, obj[$type].model);
                 _this2._$enhanceProperty(obj, prop, dsc);
 
                 names.forEach(function (name) {
@@ -344,11 +353,14 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
             "<$attrs static>";
 
             var options = arguments.length <= 2 || arguments[2] === undefined ? {} : arguments[2];
+            if (dsc.value && dsc.value[$dsc]) {
+                return dsc.value;
+            } // value is already a cell-type.dsc so no further processing needed
+
             var tmp = ('' + (dsc.value || dsc.get || dsc.set)).match(/<\$attrs(.*?)>/);
             var tmp2 = ('' + (tmp ? tmp[1] : dsc.value && dsc.value[$attrs] || '')).replace(/[\s]*([=\|\s])[\s]*/g, '$1'); // prettify: remove redundant white spaces
             var attributes = tmp2.match(/[!\$\w]+(=[\$\w]+(\|[\$\w]+)*)?/g) || []; // filter attributes including values
 
-            dsc.prop = prop;
             this._$assignAttrsToDsc(attributes, dsc);
             Object.assign(dsc, options);
 
@@ -391,7 +403,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         },
         /**
          * @private
-         * @method Type._$staticEnhanceProperty
+         * @method Type._$staticEnhance
          * @desc
          *         Static Enhances a property. It will wrap properties into a getter/setter so one is able to set static values from this.
          *         In case of a readonly property a warning is given on a set.
@@ -402,7 +414,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
          * @param {Object}        dsc     - The property descriptor.
          * @param {string}        method  - The method that is currently processed value|get|set.
          */
-        _$staticEnhanceProperty: function _$staticEnhanceProperty(obj, prop, dsc, method) {
+        _$staticEnhance: function _$staticEnhance(obj, prop, dsc, method) {
             "<$attrs static>";
 
             Reflect.defineProperty(obj[$statics], prop, dsc); // add the original property to the special statics symbol
@@ -410,6 +422,12 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
             if (dsc[method] instanceof Function) {
                 return;
             } // no further processing for static methods
+            else {
+                    this._$staticEnhanceProperty(obj, prop, dsc);
+                }
+        },
+        _$staticEnhanceProperty: function _$staticEnhanceProperty(obj, prop, dsc) {
+            "<$attrs static>";
 
             eget[$owner] = eset[$owner] = obj;
 
@@ -450,6 +468,28 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         },
 
         /**
+         * @method Type#compose
+         * @desc   **aliases:** with, mixin
+         *
+         * @param {...Object} protos
+         *
+         * returns {Type} this
+         */
+        compose: function compose() {
+            var _this3 = this;
+
+            for (var _len = arguments.length, protos = Array(_len), _key = 0; _key < _len; _key++) {
+                protos[_key] = arguments[_key];
+            }
+
+            protos.forEach(function (proto) {
+                return _this3.properties(proto[$type].model);
+            });
+
+            return this;
+        },
+
+        /**
          * @private
          * @method Type._$upperEnhanceProperty
          * @desc
@@ -470,21 +510,21 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
             efn[$inner] = fn; // reference to retrieve the original function
 
             function efn() {
-                var _this3 = this;
+                var _this4 = this;
 
-                for (var _len = arguments.length, args = Array(_len), _key = 0; _key < _len; _key++) {
-                    args[_key] = arguments[_key];
+                for (var _len2 = arguments.length, args = Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
+                    args[_key2] = arguments[_key2];
                 }
 
                 var tmp = this._upper,
                     out = void 0;
 
                 this._upper = function () {
-                    for (var _len2 = arguments.length, args = Array(_len2), _key2 = 0; _key2 < _len2; _key2++) {
-                        args[_key2] = arguments[_key2];
+                    for (var _len3 = arguments.length, args = Array(_len3), _key3 = 0; _key3 < _len3; _key3++) {
+                        args[_key3] = arguments[_key3];
                     }
 
-                    return getPropertyDescriptor(getPrototypeOf(efn[$owner]), prop)[method].apply(_this3, args);
+                    return getPropertyDescriptor(getPrototypeOf(efn[$owner]), prop)[method].apply(_this4, args);
                 }; // dynamically get the upper method
                 out = fn.apply(this, args);
                 this._upper = tmp;
@@ -509,7 +549,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
         _$validate: function _$validate(obj, prop, dsc, props) {
             "<$attrs static>";
 
-            var _this4 = this;
+            var _this5 = this;
 
             if (!dsc.validate) {
                 return;
@@ -520,9 +560,9 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
                     return;
                 } // continue
 
-                _this4._$validatePrivateUse(obj, prop, dsc, method);
-                _this4._$validateNonStaticMethodUsage(obj, prop, dsc, method, props);
-                _this4._$validateOverrides(obj, prop, dsc, method);
+                _this5._$validatePrivateUse(obj, prop, dsc, method);
+                _this5._$validateNonStaticMethodUsage(obj, prop, dsc, method, props);
+                _this5._$validateOverrides(obj, prop, dsc, method);
             });
         },
 
@@ -668,7 +708,7 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
     /**
      * @constructor Type
      * @desc
-     *        Prototypal inheritance algorithm supporting traits & dependency injection.
+     *        Prototypal(OLOO) inheritance algorithm.
      *
      * @param  {Object} model - The model for the type.
      *
@@ -680,7 +720,10 @@ function _defineProperty(obj, key, value) { if (key in obj) { Object.definePrope
 
         return self.init(model);
     }
-
+    Type.prototype[$type] = { // fake type instance
+        name: 'Type',
+        model: {}
+    };
     properties._$extend(Type.prototype, properties);
 
     return Type;

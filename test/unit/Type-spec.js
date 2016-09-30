@@ -97,7 +97,7 @@ define([
                 expect(Expert.staticMethod()).to.eql('iamstatic');
 
                 // wrapping of static properties
-                e2 = Object.create(Expert);
+                const e2 = Object.create(Expert);
                 e1.staticProp = 20;
                 expect(e1.staticProp).to.eql(20);
                 expect(e2.staticProp).to.eql(20);
@@ -769,6 +769,43 @@ define([
                 expect(B.isPrototypeOf(e)).to.be.true;
                 expect(S.isPrototypeOf(e)).to.be.true;
                 expect(E.isPrototypeOf(e)).to.be.true;
+            });
+        });
+
+        describe("composition", function() {
+
+            it("should be able to compose types using other types", function() {
+                const Beginner = Type({properties: {
+                    html()
+                    {
+                        return 'html'
+                    }
+                }});
+
+                const Specialist = Type({properties: {
+                    css()
+                    {
+                        return 'css'
+                    }
+                }});
+
+                const Expert = Type({properties: {
+                    js()
+                    {
+                        return 'js'
+                    }
+                }});
+
+                ComposedExpert =  Type({compose: [Beginner, Specialist, Expert], properties: {
+                    skills()
+                    {
+                        return [this.html(), this.css(), this.js()]
+                    }
+                }});
+
+                const ce = Object.create(ComposedExpert);
+
+                expect(ce.skills()).to.eql(['html', 'css', 'js']);
             });
         });
     });

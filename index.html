@@ -17,104 +17,36 @@
             /************************************************/
 
             const Beginner = Type({properties: {
-                init(skill)
+                html()
                 {
-                    this._x = 0;
-
-                    this.skills = ['html'];
-                    if(skill) {this.skills.push(skill)}
-
-                    return this
-                },
-                stringify()
-                {
-                    return 'beginner'
-                },
-                get x()
-                {
-                    return this._x - 1
-                },
-                set x(val)
-                {
-                    return this._x = val + 2
-                },
-                staticMethod() {
-                    "<$attrs static>";  // attributes can be used to supply additional functionality
-                    {
-                        return 'iamstatic'
-                    }}
+                    return 'html'
+                }
             }});
 
             const Specialist = Type({links: Beginner, properties: {
-                init(skill)
+                css()
                 {
-                    this._upper(skill);
-                    this.skills.push('css');
-
-                    return this
+                    return 'css'
                 }
             }});
-            // using the new keyword is also possible
-            const Expert = new Type({name: 'Expert', links: Specialist, properties: { // an additional name can be supplied for debugging purposes
-                init(skill)
-                {
-                    this._x = 7;
 
-                    this._upper(skill);
-                    this.skills.push('js');
-
-                    return this
-                },
-                stringify()
+            const Expert = Type({name: 'Expert', links: Specialist, properties: { // an additional name can be supplied for debugging purposes
+                js()
                 {
-                    return 'expert'
-                },
-                get x()
-                {
-                    return this._upper() - 3
-                },
-                set x(val)
-                {
-                    this._x = this._upper(val) + 4
-                },
-                staticMethod() {
-                    "<$attrs static enumerable !configurable>";  // attributes can be used to supply additional functionality
-                    {
-                        return this._upper()
-                    }},
-                staticProp: {[$attrs]: 'static', value: 10}
+                    return 'js'
+                }
             }});
 
-            const e = Object.create(Expert).init('xhtml');
+            ComposedExpert =  Type({compose: [Beginner, Specialist, Expert], properties: {
+                skills()
+                {
+                    return [this.html(), this.css(), this.js()]
+                }
+            }});
 
-            !function() {
-                const B = Type({
-                    name: 'Beginner', properties: {
-                        staticMethod()
-                        {
-                            "<$attrs static>";
+            const ce = Object.create(ComposedExpert);
 
-                            return 'iamstatic'
-                        }
-                    }
-                });
-
-                // make sure it is able to find properties higher up the prototype chain
-                const S = Type({
-                    name: 'Specialist', links: B, properties: {}
-                });
-
-                const E = Type({
-                    name: 'Expert', links: S, properties: {
-                        staticMethod()
-                        {
-                            "<$attrs static>";
-
-                            return this._upper()
-                        }
-                    }
-                });
-            }()
+            console.log(ce.skills());
 
             /************************************************/
 
