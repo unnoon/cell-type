@@ -67,6 +67,8 @@ const properties = {
         if(data.links)      {this.links(data.links)}
         if(data.inherits)   {this.inherits(data.inherits)}
         if(data.compose)    {this.compose(...data.compose)}
+        if(data.mixin)      {this.mixin(...data.mixin)}
+        if(data.with)       {this.with(...data.with)}
         if(data.statics)    {this.statics(data.statics)}
         if(data.properties) {this.properties(data.properties)}
     },
@@ -195,7 +197,7 @@ const properties = {
      * @param {Object} obj  - the object in the prototype chain.
      * @param {string} prop - the name of the property.
      *
-     * @returns {Object|undefined} - the property descriptor or null in case no descriptor is found.
+     * @returns {Object|undefined} - the property descriptor or undefined in case no descriptor is found.
      */
     $getPropertyDescriptor(obj, prop)
     {   "<$attrs static>";
@@ -360,7 +362,8 @@ const properties = {
      * returns {Type} this
      */
     compose(...protos)
-    {
+    {   "<$attrs alias=with|mixin>";
+
         protos.forEach(proto => this.properties(proto[$type].model));
 
         return this
@@ -406,9 +409,9 @@ const properties = {
      * @param {Object}        obj   - The object that was extended with the properties.
      * @param {string|Symbol} prop  - The property to be processed.
      * @param {Object}        dsc   - The property descriptor.
-     * @param {Object}        props - Object containing all descriptors of the properties currently processed.
+     * @param {Object}        model - Object containing all descriptors of the properties currently processed.
      */
-    _$validate(obj, prop, dsc, props)
+    _$validate(obj, prop, dsc, model)
     {   "<$attrs static>";
         if(!dsc.validate) {return}
 
@@ -416,8 +419,9 @@ const properties = {
             if(!dsc.hasOwnProperty(method)) {return} // continue
 
             this._$validatePrivateUse(obj, prop, dsc, method);
-            this._$validateNonStaticMethodUsage(obj, prop, dsc, method, props);
+            this._$validateNonStaticMethodUsage(obj, prop, dsc, method, model);
             this._$validateOverrides(obj, prop, dsc, method);
+            this._$validateOverwrites(obj, prop, dsc, method);
         });
     },
     /**
@@ -477,6 +481,13 @@ const properties = {
         if(!(prop in Object.getPrototypeOf(obj)) || dsc.override || methodWithUpper) {return}
 
         console.warn(`[${obj[$type].name || 'Type'}]: No overriding attribute ${isFn ? 'and not calling upper ' : ''}in overriding (${method}) property '${prop}'.`);
+    },
+    _$validateOverwrites(obj, prop, dsc, method)
+    {   "<$attrs static>";
+
+        if(!obj.hasOwnProperty(prop)) {return}
+
+        console.warn(`[${obj[$type].name || 'Type'}]: Property (${method}) ${prop} is already defined and will be overwritten.`);
     },
     /**
      * @private

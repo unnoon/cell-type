@@ -656,6 +656,16 @@ define([
     
                 expect(BType).to.throw("[Type]: Illegal usage of non-static methods 'this.nonStatic1,this.nonStatic2' in static method 'illegalNonStaticMethodCall'.");
             });
+
+            it("should give a warning in case of an overwrite.", function() {
+
+                const B = Type({mixin: [Type({properties: {init() {}}})], properties: {
+                    init() {
+                    }
+                }});
+
+                expect(console.warn.calledWith("[Type]: Property (value) init is already defined and will be overwritten.")).to.be.true;
+            });
         });
     
         describe("Statics", function() {
