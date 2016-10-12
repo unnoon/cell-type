@@ -8,7 +8,6 @@
     </head>
     <body>
         <script src="src/Type.js"></script>
-        <script src="lib/stampit.js"></script>
         <!--<script src="test/prototypes/syntax.js"></script>-->
         <script>
             const $type    = Symbol.for('cell-type');
@@ -32,39 +31,22 @@
 
             /************************************************/
 
-            var $init  = Symbol('init');
-            var $prop  = Symbol('prop');
-            var $$prop = Symbol('$prop');
-
             const B = Type({name: 'Beginner', properties: {
-                [$init](skill)
-                {
-                    this.skills = ['html'];
-                    if(skill) {this.skills.push(skill)}
-
-                    return this
-                },
-                [$prop]: 42,
-                [$$prop]: {[$attrs]: 'static', value: 43}
+                solidProp: {[$attrs]: "solid", value: 100},
+                attachedProp: {[$attrs]: "attached", value: 200}
             }});
 
-            const b = Object.create(B, B[$state])[$init]('xhtml');
+            const b = Object.create(B, B[$state]);
 
-            expect(b.skills).to.eql(["html", "xhtml"]);
-            expect(b[$prop]).to.eql(42);
-            expect(b[$$prop]).to.eql(43);
-            b[$$prop] = 44;
-            expect(b[$$prop]).to.eql(44);
-            expect(b[$statics][$$prop]).to.eql(44);
+            const dsc1 = Object.getOwnPropertyDescriptor(b, 'solidProp');
+            const dsc2 = Object.getOwnPropertyDescriptor(b, 'attachedProp');
 
-            const stamp = stampit.properties({ foo: { bar: 'bar' }}).statics({
-                sprop: 666,
-                smethod() {return 'kabouter'}
-            });
+            console.log(b[$state]);
 
-            const obj = stamp.create();
-
-            console.log(obj.foo.bar);
+            expect(dsc1.configurable).to.be.false;
+            expect(dsc1.writable).to.be.false;
+            expect(dsc2.configurable).to.be.false;
+            expect(dsc2.writable).to.be.true;
 
             /************************************************/
 

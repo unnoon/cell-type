@@ -15,7 +15,7 @@
 
 const ATTRS = ['state', 'static', 'alias', 'override', 'enumerable', 'configurable', 'writable', 'const', 'readonly', 'frozen', 'sealed', 'extensible', 'attached', 'solid', 'validate'];
 const RGX   = {
-    upper:             /\bthis\._upper\b/,
+    upper:             /\bthis\.upper\b/,
     illegalPrivateUse: /\b(?!this)[\w\$]+\._[^_\.][\w\$]+\b/g,
     thisMethodUsage:   /\bthis\.[\$\w]+\b/g,
 };
@@ -23,7 +23,6 @@ const RGX   = {
 // symbols
 const $type    = Symbol.for('cell-type');       // symbol for type data stored on the proto
 const $attrs   = Symbol.for('cell-type.attrs');
-const $statics = Symbol.for('cell-type.statics');
 const $state   = Symbol.for('cell-type.state');
 const $owner   = Symbol.for('cell-type.owner'); // symbol to store the owner of a method so we can get the proper dynamic super.
 const $inner   = Symbol.for('cell-type.inner'); // reference to the wrapped inner function
@@ -56,9 +55,13 @@ const properties = {
     init(data)
     {   this._proto = null;
         // optional not necessarily unique name for debugging purposes
-        this.name  = data.name || '';
-        this.model = {}; // Where the key is the name|symbol and the value an extended descriptor including additional attributes.
-
+        this.name    = data.name || '';
+        // TODO maybe split model into state/statics/methods
+        this.model   = {}; // Where the key is the name|symbol and the value an extended descriptor including additional attributes.
+        this.state_  = {};
+        this.static  = {
+            upper: null
+        };
         this.add(data);
 
         return this.proto
@@ -131,7 +134,12 @@ const properties = {
     },
     crawlState()
     {
+        const state = Object.assign({}, this.state_);
+        let   proto = this.proto;
 
+        while((proto = Object.getPrototypeOf(proto)) && proto[$type]) {Object.assign(state, proto[$type].state_)}
+
+        return state
     },
     /**
      * @private
@@ -148,19 +156,16 @@ const properties = {
     "<$attrs static>";
     {
         return Object.defineProperties(proto, {
-            [$type]:    {value: type}, // store the Type model
-            [$state]:   {value: {}},   // object holding  state descriptors
-            [$statics]: {value: {      // stores static wrapped properties so they don't pollute the prototype
-                _upper: null
-            }},
-            _upper:     {get: () => proto[$statics]._upper, set: (v) => proto[$statics]._upper = v, enumerable: true} // TODO check if a accessor is really necesary
+            [$type]:  {value: type}, // store the Type model
+            [$state]: {get: () => type.crawlState()}, // dynamically get the state. TODO option to make this static
+            upper:    {get: () => proto[$type].static.upper, set: (v) => proto[$type].static.upper = v, enumerable: true} // TODO check if a accessor is really necesary
         });
     }},
     /**
      * @private
      * @method Type._$enhanceProperty
      * @desc
-     *         Enhances a property in case of _upper, statics, extensibility, sealing and freezing
+     *         Enhances a property in case of upper, statics, extensibility, sealing and freezing
      *
      * @param {Object}        obj  - The owner of the property that needs to be enhanced.
      * @param {string|Symbol} prop - The property that needs enhancement.
@@ -335,11 +340,11 @@ const properties = {
 
         return this
     },
-    _$stateEnhance(type, prop, dsc, method)
+    _$stateEnhance(proto, prop, dsc, method)
     {   "<$attrs static>";
 
         // get state descriptor from model
-        Reflect.defineProperty(type[$state], prop, {get: () => type[$type].model[prop], enumerable: true})
+        Reflect.defineProperty(proto[$type].state_, prop, {get: () => proto[$type].model[prop], enumerable: true})
     },
     /**
      * @private
@@ -359,11 +364,11 @@ const properties = {
 
         if(dsc[method] instanceof Function)
         {
-            Reflect.defineProperty(obj[$statics], prop, {get: () => obj[prop]})
+            Reflect.defineProperty(obj[$type].static, prop, {get: () => obj[prop]})
         }
         else
         {
-            Reflect.defineProperty(obj[$statics], prop, dsc);
+            Reflect.defineProperty(obj[$type].static, prop, dsc);
             this._$staticEnhanceProperty(obj, prop, dsc)
         }
     },
@@ -372,8 +377,8 @@ const properties = {
 
         eget[$owner] = eset[$owner] = obj;
 
-        function eget()    {return eget[$owner][$statics][prop]} // TODO $owner is unnecessary?!?
-        function eset(val) {eset[$owner][$statics][prop] = val}
+        function eget()    {return eget[$owner][$type].static[prop]} // TODO $owner is unnecessary?!?
+        function eset(val) {eset[$owner][$type].static[prop] = val}
 
         dsc.get = eget;
         dsc.set = dsc.writable ? eset : (val) => console.warn(`Trying to set value '${val}' on readonly (static) property '${prop}'.`);
@@ -392,7 +397,7 @@ const properties = {
      * @returns {Type|Object} this|object containing all static properties.
      */
     statics(props)
-    {   if(props === undefined) {return this.proto[$statics]}
+    {   if(props === undefined) {return this.proto[$type].static}
 
         this._$extend(this.proto, props, {static: true});
 
@@ -435,11 +440,11 @@ const properties = {
         efn[$inner] = fn; // reference to retrieve the original function
 
         function efn(...args) {
-            let tmp = this._upper, out;
+            let tmp = this.upper, out;
 
-            this._upper = (...args) => getPropertyDescriptor(getPrototypeOf(efn[$owner]), prop)[method].apply(this, args); // dynamically get the upper method
+            this.upper = (...args) => getPropertyDescriptor(getPrototypeOf(efn[$owner]), prop)[method].apply(this, args); // dynamically get the upper method
             out = fn.apply(this, args);
-            this._upper = tmp;
+            this.upper = tmp;
 
             return out;
         }
@@ -499,7 +504,7 @@ const properties = {
             let name = prop.slice(prop.indexOf('.')+1);
             if(!(props[name] && props[name].static)) protoSearch : 
             {
-                for(let proto of protos) {if(proto[$statics] && proto[$statics].hasOwnProperty(name)) {break protoSearch}}
+                for(let proto of protos) {if(proto[$type] && proto[$type].static && proto[$type].static.hasOwnProperty(name)) {break protoSearch}}
                 // if not found as a static push illegal non-static property to the array
                 illegalNonStaticProperties.push(prop);
             }
@@ -513,7 +518,7 @@ const properties = {
      * @private
      * @method Type._$validateOverrides
      * @desc
-     *         Validates overrides and returns a warning in case a method/property is overriding another and no _upper or no override attribute is present.
+     *         Validates overrides and returns a warning in case a method/property is overriding another and no upper or no override attribute is present.
      *
      * @param {Object}        obj    - Owner of the property that needs validation
      * @param {string|Symbol} prop   - Property that needs validation.
@@ -552,7 +557,7 @@ const properties = {
     _$validatePrivateUse(obj, prop, dsc, method)
     {   "<$attrs static>";
         const matches = `${dsc[method]}`.match(RGX.illegalPrivateUse);
-
+        // FIXME this does not match [prop]._private
         if(typeof(dsc[method]) !== 'function' || !matches) {return}
 
         throw new Error(`[${obj[$type].name || 'Type'}]: Illegal use of private propert${matches.length > 1 ? 'ies' : 'y'} '${matches}' in (${method}) method '${prop}'.`)
@@ -585,10 +590,119 @@ Type.prototype[$state] = {};
  * @desc
  *       Object hidden behind a symbol to store all original statics.
  */
-Type.prototype[$statics] = {
-    _upper: null
+Type.prototype[$type].static = {
+    upper: null
 };
 properties._$extend(Type.prototype, properties);
+
+
+/**
+ * cloning function
+ *
+ * @param {string=} _mode_='shallow' - 'shallow|deep' can be omitted completely
+ * @param {Object}   obj             - object to be cloned
+ * @param {Array=}   visited_        - array of visited objects to check for circular references
+ * @param {Array=}   clones_         - array of respective clones to fill circular references
+ *
+ * @returns {Object} - clone of the object
+ */
+function clone(_mode_, obj, visited_, clones_) {
+    var mode = obj && _mode_ || 'shallow';
+    var obj  = obj || _mode_;
+
+    if(isPrimitive(obj)) {return obj}
+    if(visited_ && ~visited_.indexOf(obj)) {return clones_[visited_.indexOf(obj)]}
+
+    var cln = Array.isArray(obj)
+        ? [] // otherwise chrome dev tools does not understand it is an array
+        : Object.create(Object.getPrototypeOf(obj));
+
+    visited_ = visited_ || [];
+    clones_  = clones_  || [];
+
+    visited_.push(obj);
+    clones_.push(cln);
+
+    Object.getOwnPropertyNames(obj).forEach(function(name) {
+        var dsc = Object.getOwnPropertyDescriptor(obj, name);
+        dsc.value = dsc.hasOwnProperty('value') && mode === 'deep'
+            ? dsc.value = clone(mode, dsc.value, visited_, clones_)
+            : dsc.value;
+
+        Object.defineProperty(cln, name, dsc);
+    });
+
+    if(!Object.isExtensible(obj)) {Object.preventExtensions(cln)}
+    if(Object.isSealed(obj))      {Object.seal(cln)}
+    if(Object.isFrozen(obj))      {Object.freeze(cln)}
+
+    return cln;
+}
+
+clone.deep = clone.bind(null, 'deep');
+
+function isPrimitive(obj)
+{
+    var type = typeof(obj);
+    return (obj === null || (type !== 'object' && type !== 'function'));
+}
+
+/**
+ * local assign method including deep option
+ *
+ * @public
+ * @method obj#assign
+ *
+ * @this {Object}
+ *
+ * @param {string=}        _mode_ - mode for assignation 'shallow'|'deep'. default is 'shallow'
+ * @param {...Object} ___sources  - one or more object sources
+ *
+ * @return {Object} this - this after assignation
+ */
+function assign(_mode_, obj, ___sources)
+{   "use strict";
+
+    var mode = _mode_ === 'deep' || 'shallow' ? _mode_ : 'shallow';
+    var i    = _mode_ === 'deep' || 'shallow' ? 2      : 1;
+    var from;
+    var to = obj;
+    var symbols;
+
+    for (; i < arguments.length; i++) {
+        from = Object(arguments[i]);
+
+        for (var key in from) {
+            if (!from.hasOwnProperty(key)) {continue}
+
+            if(mode === 'deep' && isObject(to[key]) && isObject(from[key]))
+            {
+                assign(mode, to[key], from[key])
+            }
+            else if(to.hasOwnProperty(key) && Object.getOwnPropertyDescriptor(to, key).writable === false)
+            {
+
+            }
+            else
+            {
+                to[key] = from[key];
+            }
+        }
+
+        if (Object.getOwnPropertySymbols) {
+            symbols = Object.getOwnPropertySymbols(from);
+            for (var s = 0; s < symbols.length; s++) {
+                if (propIsEnumerable.call(from, symbols[s])) { // FIXME propIsEnumerable
+                    to[symbols[s]] = from[symbols[s]];
+                }
+            }
+        }
+    }
+
+    return to;
+}
+
+function isObject(obj) {return !isPrimitive(obj)}
 
 /*? if(MODULE_TYPE !== 'es6') {*/
 return Type

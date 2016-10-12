@@ -44,7 +44,7 @@ define([
                 const Specialist = Type({links: Beginner, properties: {
                     init(skill)
                     {
-                        this._upper(skill);
+                        this.upper(skill);
                         this.skills.push('css');
 
                         return this
@@ -56,7 +56,7 @@ define([
                     {
                         this._x = 7;
 
-                        this._upper(skill);
+                        this.upper(skill);
                         this.skills.push('js');
 
                         return this
@@ -67,16 +67,16 @@ define([
                     },
                     get x()
                     {
-                        return this._upper() - 3
+                        return this.upper() - 3
                     },
                     set x(val)
                     {
-                        this._x = this._upper(val) + 4
+                        this._x = this.upper(val) + 4
                     },
                     staticMethod() {
                     "<$attrs static enumerable !configurable>";  // attributes can be used to supply additional functionality
                     {
-                        return this._upper()
+                        return this.upper()
                     }},
                     staticProp: {[$attrs]: 'static', value: 10}
                 }});
@@ -129,7 +129,7 @@ define([
                 const S = Type({name: 'Specialist', links: B, properties: {
                     init(skill)
                     {
-                        this._upper(skill);
+                        this.upper(skill);
                         this.skills.push('css');
     
                         return this
@@ -141,7 +141,7 @@ define([
                     {
                         this._x = 7;
     
-                        this._upper(skill);
+                        this.upper(skill);
                         this.skills.push('js');
     
                         return this
@@ -182,15 +182,15 @@ define([
                 const E = Type({name: 'Expert', links: S, properties: {
                     init()
                     {
-                        return this._upper();
+                        return this.upper();
                     },
                     get x()
                     {
-                        return this._upper() - 3
+                        return this.upper() - 3
                     },
                     set x(val)
                     {
-                        this._x = this._upper(val) + 4
+                        this._x = this.upper(val) + 4
                     }
                 }});
     
@@ -219,12 +219,12 @@ define([
                     staticMethod()
                     {   "<$attrs static>";
     
-                        return this._upper()
+                        return this.upper()
                     }
                 }});
     
                 expect(E.staticMethod()).to.eql('iamstatic');
-                expect(E[$statics].staticMethod).to.eql(E.staticMethod);
+                expect(E[$type].static.staticMethod).to.eql(E.staticMethod);
             });
         });
     
@@ -405,7 +405,7 @@ define([
                 const S = Type({name: 'Specialist', links: BA, properties: {
                     init(skill)
                     {
-                        this._upper(skill);
+                        this.upper(skill);
                         this.skills.push('css');
     
                         return this
@@ -417,7 +417,7 @@ define([
                     {
                         this._x = 7;
     
-                        this._upper(skill);
+                        this.upper(skill);
                         this.skills.push('js');
     
                         return this
@@ -447,7 +447,7 @@ define([
                 const S = Type({name: 'Specialist', links: B, properties: {
                     init(skill)
                     {
-                        this._upper(skill);
+                        this.upper(skill);
                         this.skills.push('css');
     
                         return this
@@ -459,7 +459,7 @@ define([
                     {
                         this._x = 7;
     
-                        this._upper(skill);
+                        this.upper(skill);
                         this.skills.push('js');
     
                         return this
@@ -525,7 +525,7 @@ define([
                 const S = Type({name: 'Specialist', links: BA, properties: {
                     init(skill)
                     {
-                        this._upper(skill);
+                        this.upper(skill);
                         this.skills.push('css');
     
                         return this
@@ -537,7 +537,7 @@ define([
                     {
                         this._x = 7;
     
-                        this._upper(skill);
+                        this.upper(skill);
                         this.skills.push('js');
     
                         return this
@@ -605,7 +605,7 @@ define([
                 const S = Type({name: 'Specialist', links: B, properties: {
                     validOverwriteMethod()
                     {
-                        return this._upper()
+                        return this.upper()
                     },
                     validOverwriteMethod2()
                     {   "<$attrs override>";
@@ -714,8 +714,8 @@ define([
                     staticProperty: 42
                 }});
     
-                expect(B[$statics].staticProperty).to.eql(42);
-                expect(B[$statics].staticMethod).to.eql(B.staticMethod);
+                expect(B[$type].static.staticProperty).to.eql(42);
+                expect(B[$type].static.staticMethod).to.eql(B.staticMethod);
             });
     
             it("should be able to add static methods later on using the statics method", function() {
@@ -729,8 +729,8 @@ define([
                     staticProperty: 42
                 });
     
-                expect(B[$statics].staticProperty).to.eql(42);
-                expect(B[$statics].staticMethod).to.eql(B.staticMethod);
+                expect(B[$type].static.staticProperty).to.eql(42);
+                expect(B[$type].static.staticMethod).to.eql(B.staticMethod);
             });
     
             it("should pass the statics properties in case the statics method is given no arguments", function() {
@@ -739,7 +739,7 @@ define([
     
                 let statics = B[$type].statics();
     
-                expect(B[$statics]).to.eql(statics);
+                expect(B[$type].static).to.eql(statics);
             });
         });
     
@@ -768,7 +768,7 @@ define([
                 expect(b[$$prop]).to.eql(43);
                 b[$$prop] = 44;
                 expect(b[$$prop]).to.eql(44);
-                expect(b[$statics][$$prop]).to.eql(44);
+                expect(b[$type].static[$$prop]).to.eql(44);
             });
         });
     
@@ -789,7 +789,7 @@ define([
                 const S = Type({name: 'Specialist', links: B, properties: {
                     [$init](skill)
                     {
-                        this._upper(skill);
+                        this.upper(skill);
                         this.skills.push('css');
     
                         return this
@@ -801,7 +801,7 @@ define([
                     {
                         this._x = 7;
     
-                        this._upper(skill);
+                        this.upper(skill);
                         this.skills.push('js');
     
                         return this
@@ -888,7 +888,7 @@ define([
                 expect(b.hasOwnProperty('y')).to.be.true;
             });
 
-            xit("should be able to inherit state from higher up types by calling the init method", function() {
+            it("should be able to inherit state from higher up types by calling the init method", function() {
                 const Beginner = Type({
                     state: {
                         x: 6
@@ -901,7 +901,7 @@ define([
                     },
                 });
 
-                const b = Object.create(Beginner, Beginner[$state]);
+                const b = Object.create(Specialist, Specialist[$state]);
 
                 expect(b.x).to.eql(6);
                 expect(b.hasOwnProperty('x')).to.be.true;
