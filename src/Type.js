@@ -596,113 +596,113 @@ Type.prototype[$type].static = {
 properties._$extend(Type.prototype, properties);
 
 
-/**
- * cloning function
- *
- * @param {string=} _mode_='shallow' - 'shallow|deep' can be omitted completely
- * @param {Object}   obj             - object to be cloned
- * @param {Array=}   visited_        - array of visited objects to check for circular references
- * @param {Array=}   clones_         - array of respective clones to fill circular references
- *
- * @returns {Object} - clone of the object
- */
-function clone(_mode_, obj, visited_, clones_) {
-    var mode = obj && _mode_ || 'shallow';
-    var obj  = obj || _mode_;
-
-    if(isPrimitive(obj)) {return obj}
-    if(visited_ && ~visited_.indexOf(obj)) {return clones_[visited_.indexOf(obj)]}
-
-    var cln = Array.isArray(obj)
-        ? [] // otherwise chrome dev tools does not understand it is an array
-        : Object.create(Object.getPrototypeOf(obj));
-
-    visited_ = visited_ || [];
-    clones_  = clones_  || [];
-
-    visited_.push(obj);
-    clones_.push(cln);
-
-    Object.getOwnPropertyNames(obj).forEach(function(name) {
-        var dsc = Object.getOwnPropertyDescriptor(obj, name);
-        dsc.value = dsc.hasOwnProperty('value') && mode === 'deep'
-            ? dsc.value = clone(mode, dsc.value, visited_, clones_)
-            : dsc.value;
-
-        Object.defineProperty(cln, name, dsc);
-    });
-
-    if(!Object.isExtensible(obj)) {Object.preventExtensions(cln)}
-    if(Object.isSealed(obj))      {Object.seal(cln)}
-    if(Object.isFrozen(obj))      {Object.freeze(cln)}
-
-    return cln;
-}
-
-clone.deep = clone.bind(null, 'deep');
-
-function isPrimitive(obj)
-{
-    var type = typeof(obj);
-    return (obj === null || (type !== 'object' && type !== 'function'));
-}
-
-/**
- * local assign method including deep option
- *
- * @public
- * @method obj#assign
- *
- * @this {Object}
- *
- * @param {string=}        _mode_ - mode for assignation 'shallow'|'deep'. default is 'shallow'
- * @param {...Object} ___sources  - one or more object sources
- *
- * @return {Object} this - this after assignation
- */
-function assign(_mode_, obj, ___sources)
-{   "use strict";
-
-    var mode = _mode_ === 'deep' || 'shallow' ? _mode_ : 'shallow';
-    var i    = _mode_ === 'deep' || 'shallow' ? 2      : 1;
-    var from;
-    var to = obj;
-    var symbols;
-
-    for (; i < arguments.length; i++) {
-        from = Object(arguments[i]);
-
-        for (var key in from) {
-            if (!from.hasOwnProperty(key)) {continue}
-
-            if(mode === 'deep' && isObject(to[key]) && isObject(from[key]))
-            {
-                assign(mode, to[key], from[key])
-            }
-            else if(to.hasOwnProperty(key) && Object.getOwnPropertyDescriptor(to, key).writable === false)
-            {
-
-            }
-            else
-            {
-                to[key] = from[key];
-            }
-        }
-
-        if (Object.getOwnPropertySymbols) {
-            symbols = Object.getOwnPropertySymbols(from);
-            for (var s = 0; s < symbols.length; s++) {
-                if (propIsEnumerable.call(from, symbols[s])) { // FIXME propIsEnumerable
-                    to[symbols[s]] = from[symbols[s]];
-                }
-            }
-        }
-    }
-
-    return to;
-}
-
-function isObject(obj) {return !isPrimitive(obj)}
+// /**
+//  * cloning function
+//  *
+//  * @param {string=} _mode_='shallow' - 'shallow|deep' can be omitted completely
+//  * @param {Object}   obj             - object to be cloned
+//  * @param {Array=}   visited_        - array of visited objects to check for circular references
+//  * @param {Array=}   clones_         - array of respective clones to fill circular references
+//  *
+//  * @returns {Object} - clone of the object
+//  */
+// function clone(_mode_, obj, visited_, clones_) {
+//     var mode = obj && _mode_ || 'shallow';
+//     var obj  = obj || _mode_;
+//
+//     if(isPrimitive(obj)) {return obj}
+//     if(visited_ && ~visited_.indexOf(obj)) {return clones_[visited_.indexOf(obj)]}
+//
+//     var cln = Array.isArray(obj)
+//         ? [] // otherwise chrome dev tools does not understand it is an array
+//         : Object.create(Object.getPrototypeOf(obj));
+//
+//     visited_ = visited_ || [];
+//     clones_  = clones_  || [];
+//
+//     visited_.push(obj);
+//     clones_.push(cln);
+//
+//     Object.getOwnPropertyNames(obj).forEach(function(name) {
+//         var dsc = Object.getOwnPropertyDescriptor(obj, name);
+//         dsc.value = dsc.hasOwnProperty('value') && mode === 'deep'
+//             ? dsc.value = clone(mode, dsc.value, visited_, clones_)
+//             : dsc.value;
+//
+//         Object.defineProperty(cln, name, dsc);
+//     });
+//
+//     if(!Object.isExtensible(obj)) {Object.preventExtensions(cln)}
+//     if(Object.isSealed(obj))      {Object.seal(cln)}
+//     if(Object.isFrozen(obj))      {Object.freeze(cln)}
+//
+//     return cln;
+// }
+//
+// clone.deep = clone.bind(null, 'deep');
+//
+// function isPrimitive(obj)
+// {
+//     var type = typeof(obj);
+//     return (obj === null || (type !== 'object' && type !== 'function'));
+// }
+//
+// /**
+//  * local assign method including deep option
+//  *
+//  * @public
+//  * @method obj#assign
+//  *
+//  * @this {Object}
+//  *
+//  * @param {string=}        _mode_ - mode for assignation 'shallow'|'deep'. default is 'shallow'
+//  * @param {...Object} ___sources  - one or more object sources
+//  *
+//  * @return {Object} this - this after assignation
+//  */
+// function assign(_mode_, obj, ___sources)
+// {   "use strict";
+//
+//     var mode = _mode_ === 'deep' || 'shallow' ? _mode_ : 'shallow';
+//     var i    = _mode_ === 'deep' || 'shallow' ? 2      : 1;
+//     var from;
+//     var to = obj;
+//     var symbols;
+//
+//     for (; i < arguments.length; i++) {
+//         from = Object(arguments[i]);
+//
+//         for (var key in from) {
+//             if (!from.hasOwnProperty(key)) {continue}
+//
+//             if(mode === 'deep' && isObject(to[key]) && isObject(from[key]))
+//             {
+//                 assign(mode, to[key], from[key])
+//             }
+//             else if(to.hasOwnProperty(key) && Object.getOwnPropertyDescriptor(to, key).writable === false)
+//             {
+//
+//             }
+//             else
+//             {
+//                 to[key] = from[key];
+//             }
+//         }
+//
+//         if (Object.getOwnPropertySymbols) {
+//             symbols = Object.getOwnPropertySymbols(from);
+//             for (var s = 0; s < symbols.length; s++) {
+//                 if (propIsEnumerable.call(from, symbols[s])) { // FIXME propIsEnumerable
+//                     to[symbols[s]] = from[symbols[s]];
+//                 }
+//             }
+//         }
+//     }
+//
+//     return to;
+// }
+//
+// function isObject(obj) {return !isPrimitive(obj)}
 
 /*? if(MODULE_TYPE !== 'es6') {*/
 return Type
