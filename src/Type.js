@@ -13,7 +13,7 @@
 }(this, function type() { "use strict";
 /*es6*//*? } else { write('export default Type\n\n') } *//*<3*/
 
-const ATTRS = ['static', 'alias', 'override', 'enumerable', 'configurable', 'writable', 'const', 'readonly', 'frozen', 'sealed', 'extensible', 'attached', 'solid', 'validate'];
+const ATTRS = ['state', 'static', 'alias', 'override', 'enumerable', 'configurable', 'writable', 'const', 'readonly', 'frozen', 'sealed', 'extensible', 'attached', 'solid', 'validate'];
 const RGX   = {
     upper:             /\bthis\._upper\b/,
     illegalPrivateUse: /\b(?!this)[\w\$]+\._[^_\.][\w\$]+\b/g,
@@ -24,6 +24,7 @@ const RGX   = {
 const $type    = Symbol.for('cell-type');       // symbol for type data stored on the proto
 const $attrs   = Symbol.for('cell-type.attrs');
 const $statics = Symbol.for('cell-type.statics');
+const $state   = Symbol.for('cell-type.state');
 const $owner   = Symbol.for('cell-type.owner'); // symbol to store the owner of a method so we can get the proper dynamic super.
 const $inner   = Symbol.for('cell-type.inner'); // reference to the wrapped inner function
 const $dsc     = Symbol.for('cell-type.dsc');   // symbol to tag an object as a cell-type descriptor
@@ -64,13 +65,13 @@ const properties = {
     },
     add(data)
     {
-        if(data.links)      {this.links(data.links)}
-        if(data.inherits)   {this.inherits(data.inherits)}
-        if(data.compose)    {this.compose(...data.compose)}
-        if(data.mixin)      {this.mixin(...data.mixin)}
-        if(data.with)       {this.with(...data.with)}
-        if(data.statics)    {this.statics(data.statics)}
-        if(data.properties) {this.properties(data.properties)}
+        var links, compose, statics, props, state;
+
+        if(links   = (data.links   || data.inherits))           {this.links(links)}
+        if(compose = (data.compose || data.mixin || data.with)) {this.compose(...compose)}
+        if(statics = (data.statics))                            {this.statics(statics)}
+        if(props   = (data.properties))                         {this.properties(props)}
+        if(state   = (data.state))                              {this.state(state)}
     },
     /**
      * @name Type.$attrs
@@ -85,15 +86,28 @@ const properties = {
      * @method Type._$assignAttrsToDsc
      *
      * @param {Array<string>} attributes - Array containing the attributes.
+     * @param {string}        prop       - The property name to process naming conventions into descriptor settings.
      * @param {Object}        dsc        - The descriptor to be extended with the attributes.
+     * @param {Object}        options    - Object containing additional options.
      */
-    _$assignAttrsToDsc(attributes, dsc)
+    _$assignAttrsToDsc(attributes, prop, dsc, options)
     {   "<$attrs static>";
-        // defaults
-        dsc.enumerable = dsc.static ? true : false;
-        dsc.validate   = true;
-        dsc[$dsc]      = true;
+        // helper props
+        dsc.method   = dsc.hasOwnProperty('value') && (dsc.value instanceof Function);
+        dsc.accessor = !!(dsc.get || dsc.set);
+        dsc.property = !dsc.method && !dsc.accessor;
+        // allow automatic statification based on $ or _$ prefix
+        if(typeof(prop) === 'string' && /^_?\$/.test(prop)) {dsc.static = true}
 
+        // TODO needs cleanup
+        // global options
+        Object.assign(dsc, options);
+
+        // defaults
+        dsc.validate = true;
+        dsc[$dsc]    = true;
+
+        // property specific options
         for(let attr of attributes)
         {   let value;
             switch(true)
@@ -107,8 +121,17 @@ const properties = {
             dsc[attr] = value;
         }
 
+        if(dsc.property && !dsc.static)            {dsc.state        = true}
         if(dsc.solid || dsc.readonly || dsc.const) {dsc.writable     = false}
         if(dsc.solid || dsc.attached)              {dsc.configurable = false}
+
+        dsc.enumerable = dsc.static ? true :
+                         dsc.method ? false :
+                                      dsc.enumerable;
+    },
+    crawlState()
+    {
+
     },
     /**
      * @private
@@ -124,11 +147,13 @@ const properties = {
     _$decorate(proto, type) {
     "<$attrs static>";
     {
-        return Object.assign(proto, {
-            [$type]:     type, // store the Type model
-            [$statics]:  { // stores static wrapped properties so they don't pollute the prototype
+        return Object.defineProperties(proto, {
+            [$type]:    {value: type}, // store the Type model
+            [$state]:   {value: {}},   // object holding  state descriptors
+            [$statics]: {value: {      // stores static wrapped properties so they don't pollute the prototype
                 _upper: null
-            }
+            }},
+            _upper:     {get: () => proto[$statics]._upper, set: (v) => proto[$statics]._upper = v, enumerable: true} // TODO check if a accessor is really necesary
         });
     }},
     /**
@@ -146,6 +171,7 @@ const properties = {
         ['value', 'get', 'set'].forEach(method => {
             if(!dsc.hasOwnProperty(method)) {return} // continue
 
+            if(dsc.state)                    {this._$stateEnhance(obj, prop, dsc, method)}
             if(dsc.static && 'value' in dsc) {this._$staticEnhance(obj, prop, dsc, method)}
             if(RGX.upper.test(dsc[method]))  {this._$upperEnhanceProperty(obj, prop, dsc, method)}
             if(dsc.extensible === false)     {Object.preventExtensions(dsc[method])}
@@ -182,6 +208,7 @@ const properties = {
             this._$enhanceProperty(obj, prop, dsc);
 
             names.forEach(name => {
+                if(dsc.state) {return} // continue
                 Object.defineProperty(obj, name, dsc);
                 if(dsc.static && obj.hasOwnProperty('constructor')) {Object.defineProperty(obj.constructor, name, dsc)}
             });
@@ -263,8 +290,7 @@ const properties = {
         let tmp2       = `${tmp? tmp[1] : dsc.value && dsc.value[$attrs] || ''}`.replace(/[\s]*([=\|\s])[\s]*/g, '$1'); // prettify: remove redundant white spaces
         let attributes = tmp2.match(/[!\$\w]+(=[\$\w]+(\|[\$\w]+)*)?/g)  || []; // filter attributes including values
 
-        this._$assignAttrsToDsc(attributes, dsc);
-        Object.assign(dsc, options);
+        this._$assignAttrsToDsc(attributes, prop, dsc, options);
 
         // if value is a descriptor set the value to the descriptor value
         if(dsc.value && dsc.value[$attrs] !== undefined) {dsc.value = dsc.value.value}
@@ -302,6 +328,19 @@ const properties = {
     {
         this._proto = p
     },
+    state(props)
+    {   if(props === undefined) {return this.proto[$state]}
+
+        this._$extend(this.proto, props, {state: true});
+
+        return this
+    },
+    _$stateEnhance(type, prop, dsc, method)
+    {   "<$attrs static>";
+
+        // get state descriptor from model
+        Reflect.defineProperty(type[$state], prop, {get: () => type[$type].model[prop], enumerable: true})
+    },
     /**
      * @private
      * @method Type._$staticEnhance
@@ -317,17 +356,23 @@ const properties = {
      */
     _$staticEnhance(obj, prop, dsc, method)
     {   "<$attrs static>";
-        Reflect.defineProperty(obj[$statics], prop, dsc); // add the original property to the special statics symbol
 
-        if(dsc[method] instanceof Function) {return} // no further processing for static methods
-        else                                {this._$staticEnhanceProperty(obj, prop, dsc)}
+        if(dsc[method] instanceof Function)
+        {
+            Reflect.defineProperty(obj[$statics], prop, {get: () => obj[prop]})
+        }
+        else
+        {
+            Reflect.defineProperty(obj[$statics], prop, dsc);
+            this._$staticEnhanceProperty(obj, prop, dsc)
+        }
     },
     _$staticEnhanceProperty(obj, prop, dsc)
     {   "<$attrs static>";
 
         eget[$owner] = eset[$owner] = obj;
 
-        function eget()    {return eget[$owner][$statics][prop]}
+        function eget()    {return eget[$owner][$statics][prop]} // TODO $owner is unnecessary?!?
         function eset(val) {eset[$owner][$statics][prop] = val}
 
         dsc.get = eget;
@@ -379,8 +424,9 @@ const properties = {
      * @param {Object}        dsc    - The property descriptor.
      * @param {string}        method - Method of the descriptor value|get|set.
      */
+    // TODO move the upper method as a static property to the prototype
     _$upperEnhanceProperty(obj, prop, dsc, method)
-    {   "<$attrs static !validate>";
+    {   "<$attrs static>";
         const getPropertyDescriptor = Type.$getPropertyDescriptor;
         const getPrototypeOf        = Reflect.getPrototypeOf;
         const fn                    = dsc[method];
@@ -439,6 +485,7 @@ const properties = {
      *
      * @returns {Error|undefined}
      */
+    // TODO validate static this using some meta code or debug mode, simpler and more effective???
     _$validateNonStaticMethodUsage(obj, prop, dsc, method, props)
     {   "<$attrs static>";
         const matches = `${dsc[method]}`.match(RGX.thisMethodUsage);
@@ -509,14 +556,7 @@ const properties = {
         if(typeof(dsc[method]) !== 'function' || !matches) {return}
 
         throw new Error(`[${obj[$type].name || 'Type'}]: Illegal use of private propert${matches.length > 1 ? 'ies' : 'y'} '${matches}' in (${method}) method '${prop}'.`)
-    },
-    /**
-     * @name Type.[Symbol('cell-type.statics')]
-     * @type Object
-     * @desc
-     *       Object hidden behind a symbol to store all original statics.
-     */
-    [$statics]: {},
+    }
 };
 
 /**
@@ -537,6 +577,16 @@ function Type(model)
 Type.prototype[$type] = { // fake type instance
     name: 'Type',
     model: {}
+};
+Type.prototype[$state] = {};
+/**
+ * @name Type.[Symbol('cell-type.statics')]
+ * @type Object
+ * @desc
+ *       Object hidden behind a symbol to store all original statics.
+ */
+Type.prototype[$statics] = {
+    _upper: null
 };
 properties._$extend(Type.prototype, properties);
 

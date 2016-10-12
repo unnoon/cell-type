@@ -8,50 +8,63 @@
     </head>
     <body>
         <script src="src/Type.js"></script>
+        <script src="lib/stampit.js"></script>
         <!--<script src="test/prototypes/syntax.js"></script>-->
         <script>
             const $type    = Symbol.for('cell-type');
             const $attrs   = Symbol.for('cell-type.attrs');
             const $statics = Symbol.for('cell-type.statics');
+            const $state   = Symbol.for('cell-type.state');
+
+            const expect = function() {
+                console.log.apply(console, arguments);
+
+                return {
+                    to: {
+                        eql(){},
+                        be: {
+                            false: false,
+                            true:  true
+                        }
+                    }
+                }
+            };
 
             /************************************************/
 
-            const Beginner = Type({properties: {
-                html()
+            var $init  = Symbol('init');
+            var $prop  = Symbol('prop');
+            var $$prop = Symbol('$prop');
+
+            const B = Type({name: 'Beginner', properties: {
+                [$init](skill)
                 {
-                    return 'html'
-                }
+                    this.skills = ['html'];
+                    if(skill) {this.skills.push(skill)}
+
+                    return this
+                },
+                [$prop]: 42,
+                [$$prop]: {[$attrs]: 'static', value: 43}
             }});
 
-            const Specialist = Type({links: Beginner, properties: {
-                css()
-                {
-                    return 'css'
-                }
-            }});
+            const b = Object.create(B, B[$state])[$init]('xhtml');
 
-            const Expert = Type({name: 'Expert', links: Specialist, properties: { // an additional name can be supplied for debugging purposes
-                js()
-                {
-                    return 'js'
-                }
-            }});
+            expect(b.skills).to.eql(["html", "xhtml"]);
+            expect(b[$prop]).to.eql(42);
+            expect(b[$$prop]).to.eql(43);
+            b[$$prop] = 44;
+            expect(b[$$prop]).to.eql(44);
+            expect(b[$statics][$$prop]).to.eql(44);
 
-            ComposedExpert =  Type({compose: [Beginner, Specialist, Expert], properties: {
-                skills()
-                {
-                    return [this.html(), this.css(), this.js()]
-                }
-            }});
+            const stamp = stampit.properties({ foo: { bar: 'bar' }}).statics({
+                sprop: 666,
+                smethod() {return 'kabouter'}
+            });
 
-            const ce = Object.create(ComposedExpert);
+            const obj = stamp.create();
 
-            console.log(ce.skills());
-
-            const B = Type({mixin: [Type({properties: {init() {}}})], properties: {
-                init() {
-                }
-            }});
+            console.log(obj.foo.bar);
 
             /************************************************/
 

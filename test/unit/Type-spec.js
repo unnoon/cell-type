@@ -6,11 +6,12 @@ define([
     const $attrs   = Symbol.for('cell-type.attrs');
     const $statics = Symbol.for('cell-type.statics');
     const $inner   = Symbol.for('cell-type.inner'); // reference to the wrapped inner function
+    const $state   = Symbol.for('cell-type.state'); // reference to the wrapped inner function
 
     describe("Type", function() {
         describe("Basic usage", function() {
 
-            it("should demonstrate the basic functions of cell-multiset", function() {
+            it("should demonstrate the basic functions of cell-type", function() {
                 const Beginner = Type({properties: {
                     init(skill)
                     {
@@ -223,7 +224,7 @@ define([
                 }});
     
                 expect(E.staticMethod()).to.eql('iamstatic');
-                expect(E[$statics].staticMethod).to.eql(E.staticMethod[$inner]);
+                expect(E[$statics].staticMethod).to.eql(E.staticMethod);
             });
         });
     
@@ -247,26 +248,37 @@ define([
     
             describe("default descriptor properties", function() {
     
-                it("should set the default descriptor settings: enumerable=false configurable=true writable=true", function() {
+                it("should set the default method descriptor settings: enumerable=false configurable=true writable=true", function() {
                     const B = Type({name: 'Beginner', properties: {
-                        prop: 100
+                        method() {}
                     }});
     
-                    const dsc = Object.getOwnPropertyDescriptor(B, 'prop');
+                    const dsc = Object.getOwnPropertyDescriptor(B, 'method');
     
                     expect(dsc.enumerable).to.be.false;
                     expect(dsc.configurable).to.be.true;
                     expect(dsc.writable).to.be.true;
                 });
-    
+
+                it("should set the default static descriptor settings: enumerable=true configurable=true writable=true", function() {
+                    const B = Type({name: 'Beginner', properties: {
+                        $method() {}
+                    }});
+
+                    const dsc = Object.getOwnPropertyDescriptor(B, '$method');
+
+                    expect(dsc.enumerable).to.be.true;
+                    expect(dsc.configurable).to.be.true;
+                    expect(dsc.writable).to.be.true;
+                });
+
                 it("should set the correct values if set as attributes", function() {
                     const B = Type({name: 'Beginner', properties: {
-                        prop: {[$attrs]: "enumerable !configurable !writable", value: 100}
+                        method() {"<$attrs !configurable !writable>"}
                     }});
+
+                    const dsc = Object.getOwnPropertyDescriptor(B, 'method');
     
-                    const dsc = Object.getOwnPropertyDescriptor(B, 'prop');
-    
-                    expect(dsc.enumerable).to.be.true;
                     expect(dsc.configurable).to.be.false;
                     expect(dsc.writable).to.be.false;
                 });
@@ -276,9 +288,11 @@ define([
                         solidProp: {[$attrs]: "solid", value: 100},
                         attachedProp: {[$attrs]: "attached", value: 200}
                     }});
-    
-                    const dsc1 = Object.getOwnPropertyDescriptor(B, 'solidProp');
-                    const dsc2 = Object.getOwnPropertyDescriptor(B, 'attachedProp');
+
+                    const b = Object.create(B, B[$state]);
+
+                    const dsc1 = Object.getOwnPropertyDescriptor(b, 'solidProp');
+                    const dsc2 = Object.getOwnPropertyDescriptor(b, 'attachedProp');
     
                     expect(dsc1.configurable).to.be.false;
                     expect(dsc1.writable).to.be.false;
@@ -356,10 +370,12 @@ define([
                     sealed:          {[$attrs]: "sealed", value: {}},
                     ['!extensible']: {[$attrs]: "!extensible", value: {}},
                 }});
-    
-                expect(Object.isFrozen(B.frozen)).to.be.true;
-                expect(Object.isSealed(B.sealed)).to.be.true;
-                expect(Object.isExtensible(B['!extensible'])).to.be.false;
+
+                const b = Object.create(B, B[$state]);
+
+                expect(Object.isFrozen(b.frozen)).to.be.true;
+                expect(Object.isSealed(b.sealed)).to.be.true;
+                expect(Object.isExtensible(b['!extensible'])).to.be.false;
             });
         });
     
@@ -582,7 +598,8 @@ define([
                     {
     
                     },
-                    warnOnThisOverrideProperty: 42
+                    // warnOnThisOverrideProperty: 42,
+                    $warnOnThisOverrideProperty: 42
                 }});
     
                 const S = Type({name: 'Specialist', links: B, properties: {
@@ -596,11 +613,13 @@ define([
                     },
                     validOverwriteProp: {[$attrs]: "override", value: 43},
                     warnOnThisOverrideMethod() {},
-                    warnOnThisOverrideProperty: 43
+                    // warnOnThisOverrideProperty: 43,
+                    $warnOnThisOverrideProperty: 43
                 }});
-    
+                // TODO validations for state properties
                 expect(console.warn.calledWith("[Specialist]: No overriding attribute and not calling upper in overriding (value) property 'warnOnThisOverrideMethod'.")).to.be.true;
-                expect(console.warn.calledWith("[Specialist]: No overriding attribute in overriding (value) property 'warnOnThisOverrideProperty'.")).to.be.true;
+                // expect(console.warn.calledWith("[Specialist]: No overriding attribute in overriding (value) property 'warnOnThisOverrideProperty'.")).to.be.true;
+                expect(console.warn.calledWith("[Specialist]: No overriding attribute in overriding (value) property '$warnOnThisOverrideProperty'.")).to.be.true;
             });
     
             it("should throw an error in case of illegal use of non-static methods", function() {
@@ -658,13 +677,29 @@ define([
             });
 
             it("should give a warning in case of an overwrite.", function() {
+                var mixin = Type({properties: {
+                    init() {}
+                }});
 
-                const B = Type({mixin: [Type({properties: {init() {}}})], properties: {
+                const B = Type({mixin: [mixin], properties: {
                     init() {
                     }
                 }});
 
                 expect(console.warn.calledWith("[Type]: Property (value) init is already defined and will be overwritten.")).to.be.true;
+            });
+
+            it("should ignore a validation in case validate is set to false.", function() {
+                var mixin = Type({properties: {
+                    ow() {}
+                }});
+
+                const B = Type({mixin: [mixin], properties: {
+                    ow() { "<$attrs !validate>"
+                    }
+                }});
+
+                expect(console.warn.calledWith("[Type]: Property (value) ow is already defined and will be overwritten.")).to.be.false;
             });
         });
     
@@ -726,7 +761,7 @@ define([
                     [$$prop]: {[$attrs]: 'static', value: 43}
                 }});
     
-                const b = Object.create(B)[$init]('xhtml');
+                const b = Object.create(B, B[$state])[$init]('xhtml');
     
                 expect(b.skills).to.eql(["html", "xhtml"]);
                 expect(b[$prop]).to.eql(42);
@@ -816,6 +851,62 @@ define([
                 const ce = Object.create(ComposedExpert);
 
                 expect(ce.skills()).to.eql(['html', 'css', 'js']);
+            });
+        });
+
+        describe("state", function() {
+
+            it("should be able to define a state using the state method", function() {
+                const Beginner = Type({
+                    state: {
+                        x: 6,
+                        y: 8
+                    },
+                });
+
+                const b = Object.create(Beginner, Beginner[$state]);
+
+                expect(b.x).to.eql(6);
+                expect(b.hasOwnProperty('x')).to.be.true;
+                expect(b.y).to.eql(8);
+                expect(b.hasOwnProperty('y')).to.be.true;
+            });
+
+            it("should interpret properties as state properties by default", function() {
+                const Beginner = Type({
+                    properties: {
+                        x: 6,
+                        y: 8
+                    },
+                });
+
+                const b = Object.create(Beginner, Beginner[$state]);
+
+                expect(b.x).to.eql(6);
+                expect(b.hasOwnProperty('x')).to.be.true;
+                expect(b.y).to.eql(8);
+                expect(b.hasOwnProperty('y')).to.be.true;
+            });
+
+            xit("should be able to inherit state from higher up types by calling the init method", function() {
+                const Beginner = Type({
+                    state: {
+                        x: 6
+                    },
+                });
+
+                const Specialist = Type({links: Beginner,
+                    state: {
+                        y: 8
+                    },
+                });
+
+                const b = Object.create(Beginner, Beginner[$state]);
+
+                expect(b.x).to.eql(6);
+                expect(b.hasOwnProperty('x')).to.be.true;
+                expect(b.y).to.eql(8);
+                expect(b.hasOwnProperty('y')).to.be.true;
             });
         });
     });
