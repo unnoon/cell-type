@@ -10,10 +10,10 @@
         <script src="src/Type.js"></script>
         <!--<script src="test/prototypes/syntax.js"></script>-->
         <script>
-            const $type    = Symbol.for('cell-type');
-            const $attrs   = Symbol.for('cell-type.attrs');
-            const $statics = Symbol.for('cell-type.statics');
-            const $state   = Symbol.for('cell-type.state');
+            const $type     = Symbol.for('cell-type');
+            const $attrs    = Symbol.for('cell-type.attrs');
+            const $statics  = Symbol.for('cell-type.statics');
+            const $defaults = Symbol.for('cell-type.defaults');
 
             const expect = function() {
                 console.log.apply(console, arguments);
@@ -36,12 +36,13 @@
                 attachedProp: {[$attrs]: "attached", value: 200}
             }});
 
-            const b = Object.create(B, B[$state]);
+            const b = Object.create(B, B[$defaults]);
 
             const dsc1 = Object.getOwnPropertyDescriptor(b, 'solidProp');
             const dsc2 = Object.getOwnPropertyDescriptor(b, 'attachedProp');
 
-            console.log(b[$state]);
+            console.log(b[$defaults]);
+            console.log(B[$defaults]);
 
             expect(dsc1.configurable).to.be.false;
             expect(dsc1.writable).to.be.false;

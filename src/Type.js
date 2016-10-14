@@ -21,12 +21,12 @@ const RGX   = {
 };
 
 // symbols
-const $type    = Symbol.for('cell-type');       // symbol for type data stored on the proto
-const $attrs   = Symbol.for('cell-type.attrs');
-const $state   = Symbol.for('cell-type.state');
-const $owner   = Symbol.for('cell-type.owner'); // symbol to store the owner of a method so we can get the proper dynamic super.
-const $inner   = Symbol.for('cell-type.inner'); // reference to the wrapped inner function
-const $dsc     = Symbol.for('cell-type.dsc');   // symbol to tag an object as a cell-type descriptor
+const $type     = Symbol.for('cell-type');       // symbol for type data stored on the proto
+const $attrs    = Symbol.for('cell-type.attrs');
+const $defaults = Symbol.for('cell-type.defaults');
+const $owner    = Symbol.for('cell-type.owner'); // symbol to store the owner of a method so we can get the proper dynamic super.
+const $inner    = Symbol.for('cell-type.inner'); // reference to the wrapped inner function
+const $dsc      = Symbol.for('cell-type.dsc');   // symbol to tag an object as a cell-type descriptor
 
 const properties = {
     /**
@@ -58,7 +58,9 @@ const properties = {
         this.name    = data.name || '';
         // TODO maybe split model into state/statics/methods
         this.model   = {}; // Where the key is the name|symbol and the value an extended descriptor including additional attributes.
-        this.state_  = {};
+        this.state_  = { // TODO think of a better name
+
+        };
         this.static  = {
             upper: null
         };
@@ -156,9 +158,9 @@ const properties = {
     "<$attrs static>";
     {
         return Object.defineProperties(proto, {
-            [$type]:  {value: type}, // store the Type model
-            [$state]: {get: () => type.crawlState()}, // dynamically get the state. TODO option to make this static
-            upper:    {get: () => proto[$type].static.upper, set: (v) => proto[$type].static.upper = v, enumerable: true} // TODO check if a accessor is really necesary
+            [$type]:     {value: type}, // store the Type model
+            [$defaults]: {get: () => type.crawlState()}, // dynamically get the state. TODO option to make this static
+            upper:       {get: () => proto[$type].static.upper, set: (v) => proto[$type].static.upper = v, enumerable: true} // TODO check if a accessor is really necessary
         });
     }},
     /**
@@ -176,7 +178,7 @@ const properties = {
         ['value', 'get', 'set'].forEach(method => {
             if(!dsc.hasOwnProperty(method)) {return} // continue
 
-            if(dsc.state)                    {this._$stateEnhance(obj, prop, dsc, method)}
+            if(dsc.state)                    {this._$defaultsEnhance(obj, prop, dsc, method)}
             if(dsc.static && 'value' in dsc) {this._$staticEnhance(obj, prop, dsc, method)}
             if(RGX.upper.test(dsc[method]))  {this._$upperEnhanceProperty(obj, prop, dsc, method)}
             if(dsc.extensible === false)     {Object.preventExtensions(dsc[method])}
@@ -253,6 +255,10 @@ const properties = {
         while(proto = Object.getPrototypeOf(proto)) {protos.push(proto)}
 
         return protos
+    },
+    implements()
+    {
+        // TODO
     },
     /**
      * @method Type#links
@@ -334,13 +340,13 @@ const properties = {
         this._proto = p
     },
     state(props)
-    {   if(props === undefined) {return this.proto[$state]}
+    {   if(props === undefined) {return this.proto[$defaults]}
 
         this._$extend(this.proto, props, {state: true});
 
         return this
     },
-    _$stateEnhance(proto, prop, dsc, method)
+    _$defaultsEnhance(proto, prop, dsc, method)
     {   "<$attrs static>";
 
         // get state descriptor from model
@@ -583,7 +589,7 @@ Type.prototype[$type] = { // fake type instance
     name: 'Type',
     model: {}
 };
-Type.prototype[$state] = {};
+Type.prototype[$defaults] = {};
 /**
  * @name Type.[Symbol('cell-type.statics')]
  * @type Object
@@ -702,7 +708,9 @@ properties._$extend(Type.prototype, properties);
 //     return to;
 // }
 //
-// function isObject(obj) {return !isPrimitive(obj)}
+// assign.deep = assign.bind(null, 'deep');
+
+function isObject(obj) {return !isPrimitive(obj)}
 
 /*? if(MODULE_TYPE !== 'es6') {*/
 return Type
