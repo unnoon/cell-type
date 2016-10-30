@@ -16,7 +16,7 @@
 const ATTRS = ['state', 'static', 'alias', 'override', 'enumerable', 'configurable', 'writable', 'const', 'readonly', 'frozen', 'sealed', 'extensible', 'attached', 'solid', 'validate'];
 const RGX   = {
     upper:             /\bthis\.upper\b/,
-    illegalPrivateUse: /\b(?!this)[\w\$]+\._[^_\.][\w\$]+\b/g,
+    illegalPrivateUse: /\b(?!this)[^A-Z\s=][\w\$]+\._[^_\.][\w\$]+\b/g,
     thisMethodUsage:   /\bthis\.[\$\w]+\b/g,
 };
 
@@ -28,7 +28,7 @@ const $owner    = Symbol.for('cell-type.owner'); // symbol to store the owner of
 const $inner    = Symbol.for('cell-type.inner'); // reference to the wrapped inner function
 const $dsc      = Symbol.for('cell-type.dsc');   // symbol to tag an object as a cell-type descriptor
 
-const properties = {
+const Prototype = {
     /**
      * @readonly
      * @name Type.$info
@@ -178,9 +178,9 @@ const properties = {
         ['value', 'get', 'set'].forEach(method => {
             if(!dsc.hasOwnProperty(method)) {return} // continue
 
-            if(dsc.state)                    {this._$defaultsEnhance(obj, prop, dsc, method)}
-            if(dsc.static && 'value' in dsc) {this._$staticEnhance(obj, prop, dsc, method)}
-            if(RGX.upper.test(dsc[method]))  {this._$upperEnhanceProperty(obj, prop, dsc, method)}
+            if(dsc.state)                    {Prototype._$defaultsEnhance(obj, prop, dsc, method)}
+            if(dsc.static && 'value' in dsc) {Prototype._$staticEnhance(obj, prop, dsc, method)}
+            if(RGX.upper.test(dsc[method]))  {Prototype._$upperEnhanceProperty(obj, prop, dsc, method)}
             if(dsc.extensible === false)     {Object.preventExtensions(dsc[method])}
             if(dsc.sealed)                   {Object.seal(dsc[method])}
             if(dsc.frozen)                   {Object.freeze(dsc[method])}
@@ -204,15 +204,15 @@ const properties = {
         const keys = [...Object.getOwnPropertySymbols(properties), ...Object.keys(properties)];
 
         keys.forEach(prop => {
-            obj[$type].model[prop] = this._$processDescAttrs(prop, Object.getOwnPropertyDescriptor(properties, prop), options);
+            obj[$type].model[prop] = Prototype._$processDescAttrs(prop, Object.getOwnPropertyDescriptor(properties, prop), options);
         });
 
         keys.forEach(prop => {
             let dsc   = obj[$type].model[prop];
             let names = dsc.alias || []; names.unshift(prop);
 
-            this._$validate(obj, prop, dsc, obj[$type].model);
-            this._$enhanceProperty(obj, prop, dsc);
+            Prototype._$validate(obj, prop, dsc, obj[$type].model);
+            Prototype._$enhanceProperty(obj, prop, dsc);
 
             names.forEach(name => {
                 if(dsc.state) {return} // continue
@@ -276,7 +276,7 @@ const properties = {
     {   if(proto === undefined) {return Reflect.getPrototypeOf(this.proto)}
 
         this.proto = !this._proto
-            ? this._$decorate(Object.create(proto), this)
+            ? Prototype._$decorate(Object.create(proto), this)
             : Reflect.setPrototypeOf(this.proto, proto); // try to avoid this as it is slow.
 
         return this
@@ -301,7 +301,7 @@ const properties = {
         let tmp2       = `${tmp? tmp[1] : dsc.value && dsc.value[$attrs] || ''}`.replace(/[\s]*([=\|\s])[\s]*/g, '$1'); // prettify: remove redundant white spaces
         let attributes = tmp2.match(/[!\$\w]+(=[\$\w]+(\|[\$\w]+)*)?/g)  || []; // filter attributes including values
 
-        this._$assignAttrsToDsc(attributes, prop, dsc, options);
+        Prototype._$assignAttrsToDsc(attributes, prop, dsc, options);
 
         // if value is a descriptor set the value to the descriptor value
         if(dsc.value && dsc.value[$attrs] !== undefined) {dsc.value = dsc.value.value}
@@ -319,7 +319,7 @@ const properties = {
      */
     properties(props)
     {
-        this._$extend(this.proto, props);
+        Prototype._$extend(this.proto, props);
 
         return this
     },
@@ -333,7 +333,7 @@ const properties = {
      */
     get proto()
     {
-        return this._proto || (this._proto = this._$decorate({}, this)); // _$decorate a plain obj as type
+        return this._proto || (this._proto = Prototype._$decorate({}, this)); // _$decorate a plain obj as type
     },
     set proto(p)
     {
@@ -342,7 +342,7 @@ const properties = {
     state(props)
     {   if(props === undefined) {return this.proto[$defaults]}
 
-        this._$extend(this.proto, props, {state: true});
+        Prototype._$extend(this.proto, props, {state: true});
 
         return this
     },
@@ -356,9 +356,7 @@ const properties = {
      * @private
      * @method Type._$staticEnhance
      * @desc
-     *         Static Enhances a property. It will wrap properties into a getter/setter so one is able to set static values from this.
-     *         In case of a readonly property a warning is given on a set.
-     *         All properties & methods will be added to the $statics symbol on the prototype.
+     *         Handles static properties. Adding them to as a getter to the statics object.
      *
      * @param {Object}        obj     - The owner of the property that needs to be enhanced.
      * @param {string|Symbol} prop    - The property that needs enhancement.
@@ -367,30 +365,8 @@ const properties = {
      */
     _$staticEnhance(obj, prop, dsc, method)
     {   "<$attrs static>";
-
-        if(dsc[method] instanceof Function)
-        {
-            Reflect.defineProperty(obj[$type].static, prop, {get: () => obj[prop]})
-        }
-        else
-        {
-            Reflect.defineProperty(obj[$type].static, prop, dsc);
-            this._$staticEnhanceProperty(obj, prop, dsc)
-        }
-    },
-    _$staticEnhanceProperty(obj, prop, dsc)
-    {   "<$attrs static>";
-
-        eget[$owner] = eset[$owner] = obj;
-
-        function eget()    {return eget[$owner][$type].static[prop]} // TODO $owner is unnecessary?!?
-        function eset(val) {eset[$owner][$type].static[prop] = val}
-
-        dsc.get = eget;
-        dsc.set = dsc.writable ? eset : (val) => console.warn(`Trying to set value '${val}' on readonly (static) property '${prop}'.`);
-
-        delete dsc.value;
-        delete dsc.writable;
+        // add static getter on statics object
+        Reflect.defineProperty(obj[$type].static, prop, {get: () => obj[prop]}); // maybe at setter as well
     },
     /**
      * @method Type#statics
@@ -405,7 +381,7 @@ const properties = {
     statics(props)
     {   if(props === undefined) {return this.proto[$type].static}
 
-        this._$extend(this.proto, props, {static: true});
+        Prototype._$extend(this.proto, props, {static: true});
 
         return this
     },
@@ -438,7 +414,7 @@ const properties = {
     // TODO move the upper method as a static property to the prototype
     _$upperEnhanceProperty(obj, prop, dsc, method)
     {   "<$attrs static>";
-        const getPropertyDescriptor = Type.$getPropertyDescriptor;
+        const getPropertyDescriptor = Prototype.$getPropertyDescriptor;
         const getPrototypeOf        = Reflect.getPrototypeOf;
         const fn                    = dsc[method];
 
@@ -475,15 +451,15 @@ const properties = {
         ['value', 'get', 'set'].forEach(method => {
             if(!dsc.hasOwnProperty(method)) {return} // continue
 
-            this._$validatePrivateUse(obj, prop, dsc, method);
-            this._$validateNonStaticMethodUsage(obj, prop, dsc, method, model);
-            this._$validateOverrides(obj, prop, dsc, method);
-            this._$validateOverwrites(obj, prop, dsc, method);
+            Prototype._$validatePrivateUse(obj, prop, dsc, method);
+            Prototype._$validateStatics(obj, prop, dsc, method, model);
+            Prototype._$validateOverrides(obj, prop, dsc, method);
+            Prototype._$validateOverwrites(obj, prop, dsc, method);
         });
     },
     /**
      * @private
-     * @method Type._$validateNonStaticMethodUsage
+     * @method Type._$validateStatics
      * @desc
      *         Validates illegal use of non-static methods inside static methods.
      *         Note that this method will not check any methods called by using the syntax obj[method|$ymbol].
@@ -497,28 +473,9 @@ const properties = {
      * @returns {Error|undefined}
      */
     // TODO validate static this using some meta code or debug mode, simpler and more effective???
-    _$validateNonStaticMethodUsage(obj, prop, dsc, method, props)
+    _$validateStatics(obj, prop, dsc, method, props)
     {   "<$attrs static>";
-        const matches = `${dsc[method]}`.match(RGX.thisMethodUsage);
-
-        if(typeof(dsc[method]) !== 'function' || !dsc.static || !matches) {return}
-
-        const illegalNonStaticProperties = [];
-        const protos = this.$getPrototypesOf(obj); protos.unshift(obj);
-
-        for(let prop of matches) {
-            let name = prop.slice(prop.indexOf('.')+1);
-            if(!(props[name] && props[name].static)) protoSearch : 
-            {
-                for(let proto of protos) {if(proto[$type] && proto[$type].static && proto[$type].static.hasOwnProperty(name)) {break protoSearch}}
-                // if not found as a static push illegal non-static property to the array
-                illegalNonStaticProperties.push(prop);
-            }
-        }
-
-        if(!illegalNonStaticProperties.length) {return}
-
-        throw new Error(`[${obj[$type].name || 'Type'}]: Illegal usage of non-static method${illegalNonStaticProperties.length > 1 ? 's' : ''} '${illegalNonStaticProperties}' in static method '${prop}'.`)
+        // TODO
     },
     /**
      * @private
@@ -564,7 +521,8 @@ const properties = {
     {   "<$attrs static>";
         const matches = `${dsc[method]}`.match(RGX.illegalPrivateUse);
         // FIXME this does not match [prop]._private
-        if(typeof(dsc[method]) !== 'function' || !matches) {return}
+        // FIXME This will incorrectly mark static privates
+        if(typeof(dsc[method]) !== 'function' || !matches || dsc.static) {return}
 
         throw new Error(`[${obj[$type].name || 'Type'}]: Illegal use of private propert${matches.length > 1 ? 'ies' : 'y'} '${matches}' in (${method}) method '${prop}'.`)
     }
@@ -599,7 +557,7 @@ Type.prototype[$defaults] = {};
 Type.prototype[$type].static = {
     upper: null
 };
-properties._$extend(Type.prototype, properties);
+Prototype._$extend(Type.prototype, Prototype);
 
 
 // /**
@@ -709,8 +667,8 @@ properties._$extend(Type.prototype, properties);
 // }
 //
 // assign.deep = assign.bind(null, 'deep');
-
-function isObject(obj) {return !isPrimitive(obj)}
+//
+// function isObject(obj) {return !isPrimitive(obj)}
 
 /*? if(MODULE_TYPE !== 'es6') {*/
 return Type

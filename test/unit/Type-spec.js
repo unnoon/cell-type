@@ -1,11 +1,10 @@
 define([
     'src/Type'
 ], function(Type) {
-
-    const $type    = Symbol.for('cell-type');
-    const $attrs   = Symbol.for('cell-type.attrs');
-    const $defaults   = Symbol.for('cell-type.state'); // reference to the wrapped inner function
-    const $inject  = Symbol.for('cell-type.inject'); // reference to the wrapped inner function
+    const $type     = Symbol.for('cell-type');
+    const $attrs    = Symbol.for('cell-type.attrs');
+    const $defaults = Symbol.for('cell-type.defaults');
+    const $inject   = Symbol.for('cell-type.inject');
 
     describe("Type", function() {
         describe("Basic usage", function() {
@@ -34,10 +33,10 @@ define([
                         return this._x = val + 2
                     },
                     staticMethod() {
-                    "<$attrs static>";  // attributes can be used to supply additional functionality
-                    {
-                        return 'iamstatic'
-                    }}
+                        "<$attrs static>";  // attributes can be used to supply additional functionality
+                        {
+                            return 'iamstatic'
+                        }}
                 }});
 
                 const Specialist = Type({links: Beginner, properties: {
@@ -73,10 +72,10 @@ define([
                         this._x = this.upper(val) + 4
                     },
                     staticMethod() {
-                    "<$attrs static enumerable !configurable>";  // attributes can be used to supply additional functionality
-                    {
-                        return this.upper()
-                    }},
+                        "<$attrs static enumerable !configurable>";  // attributes can be used to supply additional functionality
+                        {
+                            return this.upper()
+                        }},
                     staticProp: {[$attrs]: 'static', value: 10}
                 }});
 
@@ -95,12 +94,6 @@ define([
 
                 // inheritance of static methods
                 expect(Expert.staticMethod()).to.eql('iamstatic');
-
-                // wrapping of static properties
-                const e2 = Object.create(Expert);
-                e1.staticProp = 20;
-                expect(e1.staticProp).to.eql(20);
-                expect(e2.staticProp).to.eql(20);
 
                 // using attributes to supply additional functionality
                 expect(Object.getOwnPropertyDescriptor(Expert, 'init').enumerable).to.be.false; // by default enumerable is set to false
@@ -223,7 +216,6 @@ define([
                 }});
 
                 expect(E.staticMethod()).to.eql('iamstatic');
-                expect(E[$type].static.staticMethod).to.eql(E.staticMethod);
             });
         });
 
@@ -232,10 +224,10 @@ define([
             it("should log a warning in case of an unknown attribute.", function() {
                 const B = Type({name: 'Beginner', properties: {
                     init() {
-                    "<$attrs unknown1 !unknown2 unknown3=huh>";
-                    {
-                        return this
-                    }},
+                        "<$attrs unknown1 !unknown2 unknown3=huh>";
+                        {
+                            return this
+                        }},
                     prop: {[$attrs]: 'unknown4', value: 100}
                 }});
 
@@ -312,40 +304,6 @@ define([
 
                     expect(B.method()).to.eql(10);
                     expect(B.prop).to.eql(10);
-                });
-
-                it("should wrap static properties using getter/setters so we can change the value on the prototype from this", function() {
-                    const B = Type({name: 'Beginner', properties: {
-                        method() {"<$attrs static>";
-                            return 10
-                        },
-                        prop: {[$attrs]: 'static', value: 10}
-                    }});
-
-                    e1      = Object.create(B);
-                    b2      = Object.create(B);
-                    e1.prop = 20;
-
-                    expect(e1.prop).to.eql(20);
-                    expect(b2.prop).to.eql(20);
-                });
-
-                it("should wrap static set method to a warning message in case it contains !writable, readonly or const", function() {
-                    const B = Type({name: 'Beginner', properties: {
-                        prop1: {[$attrs]: 'static !writable', value: 10},
-                        prop2: {[$attrs]: 'static readonly',  value: 10},
-                        prop3: {[$attrs]: 'static const',     value: 10}
-                    }});
-
-                    let b = Object.create(B);
-
-                    b.prop1 = 1;
-                    b.prop2 = 2;
-                    b.prop3 = 3;
-
-                    expect(console.warn.calledWith("Trying to set value '1' on readonly (static) property 'prop1'.")).to.be.true;
-                    expect(console.warn.calledWith("Trying to set value '2' on readonly (static) property 'prop2'.")).to.be.true;
-                    expect(console.warn.calledWith("Trying to set value '3' on readonly (static) property 'prop3'.")).to.be.true;
                 });
             });
 
@@ -621,58 +579,16 @@ define([
                 expect(console.warn.calledWith("[Specialist]: No overriding attribute in overriding (value) property '$warnOnThisOverrideProperty'.")).to.be.true;
             });
 
-            it("should throw an error in case of illegal use of non-static methods", function() {
-                function BType() {
-                    const B = Type({name: 'Beginner', properties: {
-                        nonStatic1 () {
-                            return this
-                        },
-                        nonStatic2 () {
-                            return this
-                        },
-                        illegalNonStaticMethodCall()
-                        {   "<$attrs static>";
-
-                            this.staticMethod(); // is fine
-
-                            return this.nonStatic1() + this.nonStatic2(); // should throw an error
-                        },
-                        staticMethod()
-                        {   "<$attrs static>";
-
-                            return 'stuff'
-                        }
-                    }});
-                }
-
-                expect(BType).to.throw("[Beginner]: Illegal usage of non-static methods 'this.nonStatic1,this.nonStatic2' in static method 'illegalNonStaticMethodCall'.");
-            });
-
             it("should output Type instead of the name in case none is given", function() {
                 function BType() {
                     const B = Type({properties: {
-                        nonStatic1 () {
-                            return this
-                        },
-                        nonStatic2 () {
-                            return this
-                        },
-                        illegalNonStaticMethodCall()
-                        {   "<$attrs static>";
-
-                            this.staticMethod(); // is fine
-
-                            return this.nonStatic1() + this.nonStatic2(); // should throw an error
-                        },
-                        staticMethod()
-                        {   "<$attrs static>";
-
-                            return 'stuff'
+                        init () {
+                            return illegal._private
                         }
                     }});
                 }
 
-                expect(BType).to.throw("[Type]: Illegal usage of non-static methods 'this.nonStatic1,this.nonStatic2' in static method 'illegalNonStaticMethodCall'.");
+                expect(BType).to.throw("[Type]: Illegal use of private property 'illegal._private' in (value) method 'init'.");
             });
 
             it("should give a warning in case of an overwrite.", function() {
@@ -701,114 +617,115 @@ define([
                 expect(console.warn.calledWith("[Type]: Property (value) ow is already defined and will be overwritten.")).to.be.false;
             });
         });
-    
+
         describe("Statics", function() {
-    
+
             it("should implement static properties is using the statics property without using a static attribute", function() {
-    
+
                 const B = Type({name: 'Beginner', statics: {
                     staticMethod() {
                         return 'staticMethod'
                     },
                     staticProperty: 42
                 }});
-    
+
                 expect(B[$type].static.staticProperty).to.eql(42);
                 expect(B[$type].static.staticMethod).to.eql(B.staticMethod);
             });
-    
+
             it("should be able to add static methods later on using the statics method", function() {
-    
+
                 const B = Type({name: 'Beginner'});
-    
+
                 B[$type].statics({
                     staticMethod() {
                         return 'staticMethod'
                     },
                     staticProperty: 42
                 });
-    
+
                 expect(B[$type].static.staticProperty).to.eql(42);
                 expect(B[$type].static.staticMethod).to.eql(B.staticMethod);
             });
-    
+
             it("should pass the statics properties in case the statics method is given no arguments", function() {
-    
+
                 const B = Type({name: 'Beginner'});
-    
+
                 let statics = B[$type].statics();
-    
+
                 expect(B[$type].static).to.eql(statics);
             });
         });
-    
+
         describe("simple symbol test", function() {
-            var $init  = Symbol('init');
-            var $prop  = Symbol('prop');
-            var $$prop = Symbol('$prop');
-    
+
             it("should be able use symbols as keys and use attributes such as static", function() {
+                const $init  = Symbol('init');
+                const $prop  = Symbol('prop');
+                const $$prop = Symbol('$prop');
+
                 const B = Type({name: 'Beginner', properties: {
                     [$init](skill)
                     {
                         this.skills = ['html'];
                         if(skill) {this.skills.push(skill)}
-    
+
                         return this
                     },
                     [$prop]: 42,
                     [$$prop]: {[$attrs]: 'static', value: 43}
                 }});
-    
+
                 const b = Object.create(B, B[$defaults])[$init]('xhtml');
-    
+
                 expect(b.skills).to.eql(["html", "xhtml"]);
                 expect(b[$prop]).to.eql(42);
                 expect(b[$$prop]).to.eql(43);
-                b[$$prop] = 44;
-                expect(b[$$prop]).to.eql(44);
-                expect(b[$type].static[$$prop]).to.eql(44);
+                B[$$prop] = 44;
+                expect(B[$$prop]).to.eql(44);
+                expect(B[$type].static[$$prop]).to.eql(44);
             });
         });
-    
+
         describe("inheritance principles with symbols", function() {
-            var $init = Symbol('init');
-    
+            var $init = Symbol('init2');
+
             it("should be able to use simple inheritance i.e. super/upper and proper context", function() {
                 const B = Type({name: 'Beginner', properties: {
                     [$init](skill)
                     {
                         this.skills = ['html'];
                         if(skill) {this.skills.push(skill)}
-    
+
                         return this
                     }
                 }});
-    
+
                 const S = Type({name: 'Specialist', links: B, properties: {
                     [$init](skill)
                     {
                         this.upper(skill);
                         this.skills.push('css');
-    
+
                         return this
                     }
                 }});
-    
+
                 const E = Type({name: 'Expert', links: S, properties: {
                     [$init](skill)
                     {
                         this._x = 7;
-    
+
                         this.upper(skill);
                         this.skills.push('js');
-    
+
                         return this
                     }
                 }});
-    
+
                 const e = Object.create(E)[$init]('xhtml');
-    
+
                 expect(e.skills).to.eql(["html", "xhtml", "css", "js"]);
                 expect(B.isPrototypeOf(e)).to.be.true;
                 expect(S.isPrototypeOf(e)).to.be.true;

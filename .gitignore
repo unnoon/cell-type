@@ -1,5 +1,6 @@
 #ignored folders
 .idea/
+.bak/
 .cov/
 node_modules/
 bower_components/
