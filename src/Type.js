@@ -16,8 +16,7 @@
 const ATTRS = ['state', 'static', 'alias', 'override', 'enumerable', 'configurable', 'writable', 'const', 'readonly', 'frozen', 'sealed', 'extensible', 'attached', 'solid', 'validate'];
 const RGX   = {
     upper:             /\bthis\.upper\b/,
-    illegalPrivateUse: /\b(?!this)[^A-Z\s=][\w\$]+\._[^_\.][\w\$]+\b/g,
-    thisMethodUsage:   /\bthis\.[\$\w]+\b/g,
+    illegalPrivateUse: /\b(?!this)[^A-Z\s=][\w\$]+\._[^_\.][\w\$]+\b/g
 };
 
 // symbols
@@ -55,15 +54,11 @@ const Prototype = {
     init(data)
     {   this._proto = null;
         // optional not necessarily unique name for debugging purposes
-        this.name    = data.name || '';
-        // TODO maybe split model into state/statics/methods
-        this.model   = {}; // Where the key is the name|symbol and the value an extended descriptor including additional attributes.
-        this.state_  = { // TODO think of a better name
-
-        };
-        this.static  = {
-            upper: null
-        };
+        this.name   = data.name || '';
+        this.model  = {}; // Where the key is the name|symbol and the value an extended descriptor including additional attributes.
+        // this.static  = {
+        //     upper: null
+        // };
         this.add(data);
 
         return this.proto
@@ -136,10 +131,21 @@ const Prototype = {
     },
     crawlState()
     {
-        const state = Object.assign({}, this.state_);
+        const state = crawlStateFromModel({}, this.model);
         let   proto = this.proto;
 
-        while((proto = Object.getPrototypeOf(proto)) && proto[$type]) {Object.assign(state, proto[$type].state_)}
+        while((proto = Object.getPrototypeOf(proto)) && proto[$type]) {crawlStateFromModel(state, proto[$type].model)}
+
+        function crawlStateFromModel(state, model)
+        {
+            const keys = [...Object.getOwnPropertySymbols(model), ...Object.keys(model)];
+
+            keys.forEach(prop => {
+                if(model[prop].state) {state[prop] = model[prop]}
+            });
+
+            return state
+        }
 
         return state
     },
@@ -160,7 +166,8 @@ const Prototype = {
         return Object.defineProperties(proto, {
             [$type]:     {value: type}, // store the Type model
             [$defaults]: {get: () => type.crawlState()}, // dynamically get the state. TODO option to make this static
-            upper:       {get: () => proto[$type].static.upper, set: (v) => proto[$type].static.upper = v, enumerable: true} // TODO check if a accessor is really necessary
+            // upper:       {get: () => proto[$type].static.upper, set: (v) => proto[$type].static.upper = v, enumerable: true} // TODO check if a accessor is really necessary
+            upper:       {value: null, enumerable: true, writable: true}
         });
     }},
     /**
@@ -178,8 +185,6 @@ const Prototype = {
         ['value', 'get', 'set'].forEach(method => {
             if(!dsc.hasOwnProperty(method)) {return} // continue
 
-            if(dsc.state)                    {Prototype._$defaultsEnhance(obj, prop, dsc, method)}
-            if(dsc.static && 'value' in dsc) {Prototype._$staticEnhance(obj, prop, dsc, method)}
             if(RGX.upper.test(dsc[method]))  {Prototype._$upperEnhanceProperty(obj, prop, dsc, method)}
             if(dsc.extensible === false)     {Object.preventExtensions(dsc[method])}
             if(dsc.sealed)                   {Object.seal(dsc[method])}
@@ -271,7 +276,7 @@ const Prototype = {
      *
      * @returns {Type|Object} this|linked prototype in case no arguments are given.
      */
-    links(proto=void 0) {
+    links(proto=undefined) {
     "<$attrs alias=inherits>";
     {   if(proto === undefined) {return Reflect.getPrototypeOf(this.proto)}
 
@@ -326,7 +331,7 @@ const Prototype = {
     /**
      * @name Type#proto
      * @desc
-     *       Getter/setter for the internal proto. So we can assure a proper proto is always returned.
+     *       Accessor for the internal proto. So we can assure a proper proto is always returned.
      *       This proto is the output for the Type function.
      *
      * @type Object
@@ -346,28 +351,6 @@ const Prototype = {
 
         return this
     },
-    _$defaultsEnhance(proto, prop, dsc, method)
-    {   "<$attrs static>";
-
-        // get state descriptor from model
-        Reflect.defineProperty(proto[$type].state_, prop, {get: () => proto[$type].model[prop], enumerable: true})
-    },
-    /**
-     * @private
-     * @method Type._$staticEnhance
-     * @desc
-     *         Handles static properties. Adding them to as a getter to the statics object.
-     *
-     * @param {Object}        obj     - The owner of the property that needs to be enhanced.
-     * @param {string|Symbol} prop    - The property that needs enhancement.
-     * @param {Object}        dsc     - The property descriptor.
-     * @param {string}        method  - The method that is currently processed value|get|set.
-     */
-    _$staticEnhance(obj, prop, dsc, method)
-    {   "<$attrs static>";
-        // add static getter on statics object
-        Reflect.defineProperty(obj[$type].static, prop, {get: () => obj[prop]}); // maybe at setter as well
-    },
     /**
      * @method Type#statics
      * @desc
@@ -379,7 +362,7 @@ const Prototype = {
      * @returns {Type|Object} this|object containing all static properties.
      */
     statics(props)
-    {   if(props === undefined) {return this.proto[$type].static}
+    {   if(props === undefined) {/*TODO crawl static properties*/}
 
         Prototype._$extend(this.proto, props, {static: true});
 
@@ -421,12 +404,13 @@ const Prototype = {
         efn[$owner] = obj;
         efn[$inner] = fn; // reference to retrieve the original function
 
+        // TODO create different wrapping functions for statics, accessors, etc. for improved performance
         function efn(...args) {
-            let tmp = this.upper, out;
+            let type = this.hasOwnProperty($type) ? this : getPrototypeOf(this), tmp = type.upper, out;
 
-            this.upper = (...args) => getPropertyDescriptor(getPrototypeOf(efn[$owner]), prop)[method].apply(this, args); // dynamically get the upper method
+            type.upper = (...args) => getPropertyDescriptor(getPrototypeOf(efn[$owner]), prop)[method].apply(this, args); // dynamically get the upper method
             out = fn.apply(this, args);
-            this.upper = tmp;
+            type.upper = tmp;
 
             return out;
         }
@@ -452,30 +436,10 @@ const Prototype = {
             if(!dsc.hasOwnProperty(method)) {return} // continue
 
             Prototype._$validatePrivateUse(obj, prop, dsc, method);
-            Prototype._$validateStatics(obj, prop, dsc, method, model);
+            // Prototype._$validateStatics(obj, prop, dsc, method, model); // TODO use a proxy in debug mode to verify statics
             Prototype._$validateOverrides(obj, prop, dsc, method);
             Prototype._$validateOverwrites(obj, prop, dsc, method);
         });
-    },
-    /**
-     * @private
-     * @method Type._$validateStatics
-     * @desc
-     *         Validates illegal use of non-static methods inside static methods.
-     *         Note that this method will not check any methods called by using the syntax obj[method|$ymbol].
-     *
-     * @param {Object}        obj    - Owner of the property that needs validation
-     * @param {string|Symbol} prop   - Property that needs validation.
-     * @param {Object}        dsc    - Property descriptor.
-     * @param {string}        method - Method that is evaluated value|get|set.
-     * @param {Object}        props  - Object containing all descriptors of the properties currently processed.
-     *
-     * @returns {Error|undefined}
-     */
-    // TODO validate static this using some meta code or debug mode, simpler and more effective???
-    _$validateStatics(obj, prop, dsc, method, props)
-    {   "<$attrs static>";
-        // TODO
     },
     /**
      * @private
@@ -558,117 +522,6 @@ Type.prototype[$type].static = {
     upper: null
 };
 Prototype._$extend(Type.prototype, Prototype);
-
-
-// /**
-//  * cloning function
-//  *
-//  * @param {string=} _mode_='shallow' - 'shallow|deep' can be omitted completely
-//  * @param {Object}   obj             - object to be cloned
-//  * @param {Array=}   visited_        - array of visited objects to check for circular references
-//  * @param {Array=}   clones_         - array of respective clones to fill circular references
-//  *
-//  * @returns {Object} - clone of the object
-//  */
-// function clone(_mode_, obj, visited_, clones_) {
-//     var mode = obj && _mode_ || 'shallow';
-//     var obj  = obj || _mode_;
-//
-//     if(isPrimitive(obj)) {return obj}
-//     if(visited_ && ~visited_.indexOf(obj)) {return clones_[visited_.indexOf(obj)]}
-//
-//     var cln = Array.isArray(obj)
-//         ? [] // otherwise chrome dev tools does not understand it is an array
-//         : Object.create(Object.getPrototypeOf(obj));
-//
-//     visited_ = visited_ || [];
-//     clones_  = clones_  || [];
-//
-//     visited_.push(obj);
-//     clones_.push(cln);
-//
-//     Object.getOwnPropertyNames(obj).forEach(function(name) {
-//         var dsc = Object.getOwnPropertyDescriptor(obj, name);
-//         dsc.value = dsc.hasOwnProperty('value') && mode === 'deep'
-//             ? dsc.value = clone(mode, dsc.value, visited_, clones_)
-//             : dsc.value;
-//
-//         Object.defineProperty(cln, name, dsc);
-//     });
-//
-//     if(!Object.isExtensible(obj)) {Object.preventExtensions(cln)}
-//     if(Object.isSealed(obj))      {Object.seal(cln)}
-//     if(Object.isFrozen(obj))      {Object.freeze(cln)}
-//
-//     return cln;
-// }
-//
-// clone.deep = clone.bind(null, 'deep');
-//
-// function isPrimitive(obj)
-// {
-//     var type = typeof(obj);
-//     return (obj === null || (type !== 'object' && type !== 'function'));
-// }
-//
-// /**
-//  * local assign method including deep option
-//  *
-//  * @public
-//  * @method obj#assign
-//  *
-//  * @this {Object}
-//  *
-//  * @param {string=}        _mode_ - mode for assignation 'shallow'|'deep'. default is 'shallow'
-//  * @param {...Object} ___sources  - one or more object sources
-//  *
-//  * @return {Object} this - this after assignation
-//  */
-// function assign(_mode_, obj, ___sources)
-// {   "use strict";
-//
-//     var mode = _mode_ === 'deep' || 'shallow' ? _mode_ : 'shallow';
-//     var i    = _mode_ === 'deep' || 'shallow' ? 2      : 1;
-//     var from;
-//     var to = obj;
-//     var symbols;
-//
-//     for (; i < arguments.length; i++) {
-//         from = Object(arguments[i]);
-//
-//         for (var key in from) {
-//             if (!from.hasOwnProperty(key)) {continue}
-//
-//             if(mode === 'deep' && isObject(to[key]) && isObject(from[key]))
-//             {
-//                 assign(mode, to[key], from[key])
-//             }
-//             else if(to.hasOwnProperty(key) && Object.getOwnPropertyDescriptor(to, key).writable === false)
-//             {
-//
-//             }
-//             else
-//             {
-//                 to[key] = from[key];
-//             }
-//         }
-//
-//         if (Object.getOwnPropertySymbols) {
-//             symbols = Object.getOwnPropertySymbols(from);
-//             for (var s = 0; s < symbols.length; s++) {
-//                 if (propIsEnumerable.call(from, symbols[s])) { // FIXME propIsEnumerable
-//                     to[symbols[s]] = from[symbols[s]];
-//                 }
-//             }
-//         }
-//     }
-//
-//     return to;
-// }
-//
-// assign.deep = assign.bind(null, 'deep');
-//
-// function isObject(obj) {return !isPrimitive(obj)}
 
 /*? if(MODULE_TYPE !== 'es6') {*/
 return Type

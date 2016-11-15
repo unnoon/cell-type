@@ -8,6 +8,7 @@
     </head>
     <body>
         <script src="src/Type.js"></script>
+        <!--<script src="bin/es6/Type.js"></script>-->
         <!--<script src="test/prototypes/syntax.js"></script>-->
         <script>
             const $type     = Symbol.for('cell-type');
@@ -32,122 +33,28 @@
 
             /************************************************/
 
-            var $init  = Symbol('init');
-            var $prop  = Symbol('prop');
-            var $$prop = Symbol('$prop');
+            const B = Type({name: 'Beginner', properties: {
+                staticMethod()
+                {   "<$attrs static>";
 
-            const Beginner = Type({properties: {
-                init(skill)
-                {
-                    this._x = 0;
-
-                    this.skills = ['html'];
-                    if(skill) {this.skills.push(skill)}
-
-                    return this
-                },
-                stringify()
-                {
-                    return 'beginner'
-                },
-                get x()
-                {
-                    return this._x - 1
-                },
-                set x(val)
-                {
-                    return this._x = val + 2
-                },
-                staticMethod() {
-                    "<$attrs static>";  // attributes can be used to supply additional functionality
-                    {
-                        return 'iamstatic'
-                    }}
-            }});
-
-            const Specialist = Type({links: Beginner, properties: {
-                init(skill)
-                {
-                    this.upper(skill);
-                    this.skills.push('css');
-
-                    return this
+                    return 'iamstatic'
                 }
             }});
-            // using the new keyword is also possible
-            const Expert = new Type({name: 'Expert', links: Specialist, properties: { // an additional name can be supplied for debugging purposes
-                init(skill)
-                {
-                    this._x = 7;
 
-                    this.upper(skill);
-                    this.skills.push('js');
+            // make sure it is able to find properties higher up the prototype chain
+            const S = Type({name: 'Specialist', links: B, properties: {
 
-                    return this
-                },
-                stringify()
-                {
-                    return 'expert'
-                },
-                get x()
-                {
-                    return this.upper() - 3
-                },
-                set x(val)
-                {
-                    this._x = this.upper(val) + 4
-                },
-                staticMethod() {
-                    "<$attrs static enumerable !configurable>";  // attributes can be used to supply additional functionality
-                    {
-                        return this.upper()
-                    }},
-                staticProp: {[$attrs]: 'static', value: 10}
             }});
 
-            const e1 = Object.create(Expert).init('xhtml');
+            const E = Type({name: 'Expert', links: S, properties: {
+                staticMethod()
+                {   "<$attrs static>";
 
-            // default inheritance features
-            expect(e1.skills).to.eql(["html", "xhtml", "css", "js"]);
-            expect(Beginner.isPrototypeOf(e1)).to.be.true;
-            expect(Specialist.isPrototypeOf(e1)).to.be.true;
-            expect(Expert.isPrototypeOf(e1)).to.be.true;
-
-            // inheritance for getters/setters
-            e1.x = 4;
-            expect(e1._x).to.deep.equal(10);
-            expect(e1.x).to.deep.equal(6);
-
-            // inheritance of static methods
-            expect(Expert.staticMethod()).to.eql('iamstatic');
-
-            // using attributes to supply additional functionality
-            expect(Object.getOwnPropertyDescriptor(Expert, 'init').enumerable).to.be.false; // by default enumerable is set to false
-            expect(Object.getOwnPropertyDescriptor(Expert, 'init').configurable).to.be.true; // by default configurable is set to true
-            expect(Object.getOwnPropertyDescriptor(Expert, 'staticMethod').enumerable).to.be.true; // using attributes this can be changed
-            expect(Object.getOwnPropertyDescriptor(Expert, 'staticMethod').configurable).to.be.false; // using attributes this can be changed
-
-            const B = Type({name: 'Beginner', properties: {
-                [$init](skill)
-                {
-                    this.skills = ['html'];
-                    if(skill) {this.skills.push(skill)}
-
-                    return this
-                },
-                [$prop]: 42,
-                [$$prop]: {[$attrs]: 'static', value: 43}
+                    return this.upper()
+                }
             }});
 
-            const b = Object.create(B, B[$defaults])[$init]('xhtml');
-
-            expect(b.skills).to.eql(["html", "xhtml"]);
-            expect(b[$prop]).to.eql(42);
-            expect(b[$$prop]).to.eql(43);
-            B[$$prop] = 44;
-            expect(B[$$prop]).to.eql(44);
-            expect(B[$type].static[$$prop]).to.eql(44);
-
+            expect(E.staticMethod()).to.eql('iamstatic');
 
             /************************************************/
 
