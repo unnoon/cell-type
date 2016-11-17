@@ -618,7 +618,7 @@ define([
             });
         });
 
-        xdescribe("Statics", function() {
+        describe("Statics", function() {
 
             it("should implement static properties is using the statics property without using a static attribute", function() {
 
@@ -629,8 +629,10 @@ define([
                     staticProperty: 42
                 }});
 
-                expect(B[$type].static.staticProperty).to.eql(42);
-                expect(B[$type].static.staticMethod).to.eql(B.staticMethod);
+                expect(B.hasOwnProperty('staticProperty')).to.be.true;
+                expect(B.staticProperty).to.eql(42);
+                expect(B.hasOwnProperty('staticMethod')).to.be.true;
+                expect(B.staticMethod()).to.eql('staticMethod');
             });
 
             it("should be able to add static methods later on using the statics method", function() {
@@ -644,11 +646,13 @@ define([
                     staticProperty: 42
                 });
 
-                expect(B[$type].static.staticProperty).to.eql(42);
-                expect(B[$type].static.staticMethod).to.eql(B.staticMethod);
+                expect(B.hasOwnProperty('staticProperty')).to.be.true;
+                expect(B.staticProperty).to.eql(42);
+                expect(B.hasOwnProperty('staticMethod')).to.be.true;
+                expect(B.staticMethod()).to.eql('staticMethod');
             });
 
-            it("should pass the statics properties in case the statics method is given no arguments", function() {
+            xit("should pass the statics properties in case the statics method is given no arguments", function() {
 
                 const B = Type({name: 'Beginner'});
 
@@ -839,6 +843,31 @@ define([
                 expect(b.hasOwnProperty('x')).to.be.true;
                 expect(b.y).to.eql(8);
                 expect(b.hasOwnProperty('y')).to.be.true;
+            });
+        });
+
+        describe("interfaces", function() {
+
+            it("it should warn on unimplemented properties from an interface", function() {
+
+                function itest() {
+                    const IControl = Type({
+                        properties: {
+                            left:  () => {},
+                            right: () => {},
+                        },
+                    });
+
+                    const Beginner = Type({
+                        implements: [IControl],
+                        properties: {
+                            up:   () => {},
+                            down: () => {},
+                        },
+                    });
+                }
+
+                expect(itest).to.throw('[Type]: is not implementing property left of interface.');
             });
         });
     });

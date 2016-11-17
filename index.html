@@ -33,28 +33,20 @@
 
             /************************************************/
 
-            const B = Type({name: 'Beginner', properties: {
-                staticMethod()
-                {   "<$attrs static>";
+            const IControl = Type({
+                properties: {
+                    left:  () => {},
+                    right: () => {},
+                },
+            });
 
-                    return 'iamstatic'
-                }
-            }});
-
-            // make sure it is able to find properties higher up the prototype chain
-            const S = Type({name: 'Specialist', links: B, properties: {
-
-            }});
-
-            const E = Type({name: 'Expert', links: S, properties: {
-                staticMethod()
-                {   "<$attrs static>";
-
-                    return this.upper()
-                }
-            }});
-
-            expect(E.staticMethod()).to.eql('iamstatic');
+            const Beginner = Type({
+                implements: [IControl],
+                properties: {
+                    up:   () => {},
+                    down: () => {},
+                },
+            });
 
             /************************************************/
 

@@ -54,24 +54,24 @@ const Prototype = {
     init(data)
     {   this._proto = null;
         // optional not necessarily unique name for debugging purposes
-        this.name   = data.name || '';
-        this.model  = {}; // Where the key is the name|symbol and the value an extended descriptor including additional attributes.
-        // this.static  = {
-        //     upper: null
-        // };
+        this.name       = data.name || '';
+        this.model      = {}; // Where the key is the name|symbol and the value an extended descriptor including additional attributes.
+        this.interfaces = [];
+
         this.add(data);
 
         return this.proto
     },
     add(data)
     {
-        var links, compose, statics, props, state;
+        var links, compose, statics, props, state, interfaces;
 
-        if(links   = (data.links   || data.inherits))           {this.links(links)}
-        if(compose = (data.compose || data.mixin || data.with)) {this.compose(...compose)}
-        if(statics = (data.statics))                            {this.statics(statics)}
-        if(props   = (data.properties))                         {this.properties(props)}
-        if(state   = (data.state))                              {this.state(state)}
+        if(links      = (data.links   || data.inherits))           {this.links(links)}
+        if(compose    = (data.compose || data.mixin || data.with)) {this.compose(...compose)}
+        if(statics    = (data.statics))                            {this.statics(statics)}
+        if(props      = (data.properties))                         {this.properties(props)}
+        if(state      = (data.state))                              {this.state(state)}
+        if(interfaces = (data.implements))                         {this.implements(...interfaces)}
     },
     /**
      * @name Type.$attrs
@@ -166,7 +166,6 @@ const Prototype = {
         return Object.defineProperties(proto, {
             [$type]:     {value: type}, // store the Type model
             [$defaults]: {get: () => type.crawlState()}, // dynamically get the state. TODO option to make this static
-            // upper:       {get: () => proto[$type].static.upper, set: (v) => proto[$type].static.upper = v, enumerable: true} // TODO check if a accessor is really necessary
             upper:       {value: null, enumerable: true, writable: true}
         });
     }},
@@ -261,9 +260,16 @@ const Prototype = {
 
         return protos
     },
-    implements()
+    implements(...interfaces)
     {
-        // TODO
+        // TODO allow simple object interfaces
+        interfaces.forEach(iface => {
+            this.interfaces.push(iface);
+            for(let prop in iface[$type].model)
+            {
+                if(!this.model.hasOwnProperty(prop)) {throw new Error(`[${this.name || 'Type'}]: is not implementing property ${prop} of interface.`)}
+            }
+        })
     },
     /**
      * @method Type#links
@@ -394,7 +400,6 @@ const Prototype = {
      * @param {Object}        dsc    - The property descriptor.
      * @param {string}        method - Method of the descriptor value|get|set.
      */
-    // TODO move the upper method as a static property to the prototype
     _$upperEnhanceProperty(obj, prop, dsc, method)
     {   "<$attrs static>";
         const getPropertyDescriptor = Prototype.$getPropertyDescriptor;
@@ -512,15 +517,7 @@ Type.prototype[$type] = { // fake type instance
     model: {}
 };
 Type.prototype[$defaults] = {};
-/**
- * @name Type.[Symbol('cell-type.statics')]
- * @type Object
- * @desc
- *       Object hidden behind a symbol to store all original statics.
- */
-Type.prototype[$type].static = {
-    upper: null
-};
+
 Prototype._$extend(Type.prototype, Prototype);
 
 /*? if(MODULE_TYPE !== 'es6') {*/
