@@ -34,6 +34,10 @@
             /************************************************/
 
             const IControl = Type({
+                state: {
+                    x: 0,
+                    y: 0
+                },
                 properties: {
                     left:  () => {},
                     right: () => {},
@@ -43,8 +47,10 @@
             const Beginner = Type({
                 implements: [IControl],
                 properties: {
-                    up:   () => {},
-                    down: () => {},
+                    x:0,
+                    y:0,
+                    left:   () => {},
+                    right: () => {},
                 },
             });
 

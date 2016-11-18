@@ -64,7 +64,7 @@ const Prototype = {
     },
     add(data)
     {
-        var links, compose, statics, props, state, interfaces;
+        let links, compose, statics, props, state, interfaces;
 
         if(links      = (data.links   || data.inherits))           {this.links(links)}
         if(compose    = (data.compose || data.mixin || data.with)) {this.compose(...compose)}
@@ -138,9 +138,7 @@ const Prototype = {
 
         function crawlStateFromModel(state, model)
         {
-            const keys = [...Object.getOwnPropertySymbols(model), ...Object.keys(model)];
-
-            keys.forEach(prop => {
+            [...Object.getOwnPropertySymbols(model), ...Object.keys(model)].forEach(prop => {
                 if(model[prop].state) {state[prop] = model[prop]}
             });
 
@@ -261,15 +259,18 @@ const Prototype = {
         return protos
     },
     implements(...interfaces)
-    {
-        // TODO allow simple object interfaces
+    {   if(!interfaces.length) {return this.interfaces}
+
         interfaces.forEach(iface => {
             this.interfaces.push(iface);
-            for(let prop in iface[$type].model)
+
+            for(let prop in (iface[$type] ? iface[$type].model : iface))
             {
-                if(!this.model.hasOwnProperty(prop)) {throw new Error(`[${this.name || 'Type'}]: is not implementing property ${prop} of interface.`)}
+                if(!this.model.hasOwnProperty(prop)) {throw new Error(`[${this.name || 'Type'}]: is not implementing interface property '${prop}'.`)}
             }
-        })
+        });
+
+        return this
     },
     /**
      * @method Type#links

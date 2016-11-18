@@ -848,15 +848,35 @@ define([
 
         describe("interfaces", function() {
 
-            it("it should warn on unimplemented properties from an interface", function() {
+            it("should warn on unimplemented properties from an interface", function() {
 
                 function itest() {
                     const IControl = Type({
                         properties: {
                             left:  () => {},
                             right: () => {},
-                        },
+                        }
                     });
+
+                    const Beginner = Type({
+                        implements: [IControl],
+                        properties: {
+                            up:   () => {},
+                            down: () => {},
+                        }
+                    });
+                }
+
+                expect(itest).to.throw("[Type]: is not implementing interface property 'left'.");
+            });
+
+            it("should be able to process simple objects as interfaces", function() {
+
+                function itest() {
+                    const IControl = {
+                        left:  () => {},
+                        right: () => {}
+                    };
 
                     const Beginner = Type({
                         implements: [IControl],
@@ -867,7 +887,25 @@ define([
                     });
                 }
 
-                expect(itest).to.throw('[Type]: is not implementing property left of interface.');
+                expect(itest).to.throw("[Type]: is not implementing interface property 'left'.");
+            });
+
+            it("should return the interfaces in case no args are given", function() {
+
+                const IControl = {
+                    left:  () => {},
+                    right: () => {}
+                };
+
+                const Beginner = Type({
+                    implements: [IControl],
+                    properties: {
+                        left:  () => {},
+                        right: () => {},
+                    },
+                });
+
+                expect(Beginner[$type].implements()).to.eql([IControl]);
             });
         });
     });
