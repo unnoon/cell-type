@@ -7,10 +7,10 @@
 /*? if(MODULE_TYPE !== 'es6') {*/
 !function(root, type) {
 /* istanbul ignore next */ switch(true) {
-/*amd*/    case typeof(define) === 'function' && root.define === define && !!define.amd : define(type);                                                              break;
+/*amd*/    case typeof(define) === 'function' && root.define === define && !!define.amd : define(['IOC'], type);                                                              break;
 /*node*/   case typeof(module) === 'object'   && root === module.exports                : module.exports = type();                                                   break;
 /*global*/ case !root.Type                                                              : Reflect.defineProperty(root, 'Type', {value: type(), enumerable: !0}); break; default : console.error("'Type' is already defined on root object")}
-}(this, function type() { "use strict";
+}(this, function type(ioc) { "use strict";
 /*es6*//*? } else { write('export default Type\n\n') } *//*<3*/
 
 const ATTRS = ['state', 'static', 'alias', 'override', 'enumerable', 'configurable', 'writable', 'const', 'readonly', 'frozen', 'sealed', 'extensible', 'attached', 'solid', 'validate'];
@@ -107,6 +107,18 @@ const Prototype = {
         dsc.validate = true;
         dsc[$dsc]    = true;
 
+        Prototype._$assignStringAttrs(attributes, dsc);
+
+        if(dsc.property && !dsc.static)            {dsc.state        = true}
+        if(dsc.solid || dsc.readonly || dsc.const) {dsc.writable     = false}
+        if(dsc.solid || dsc.attached)              {dsc.configurable = false}
+
+        dsc.enumerable = dsc.static ? true :
+                         dsc.method ? false :
+                                      dsc.enumerable;
+    },
+    _$assignStringAttrs(attributes, dsc)
+    {
         // property specific options
         for(let attr of attributes)
         {   let value;
@@ -120,14 +132,6 @@ const Prototype = {
 
             dsc[attr] = value;
         }
-
-        if(dsc.property && !dsc.static)            {dsc.state        = true}
-        if(dsc.solid || dsc.readonly || dsc.const) {dsc.writable     = false}
-        if(dsc.solid || dsc.attached)              {dsc.configurable = false}
-
-        dsc.enumerable = dsc.static ? true :
-                         dsc.method ? false :
-                                      dsc.enumerable;
     },
     crawlState()
     {
@@ -160,10 +164,10 @@ const Prototype = {
      */
     _$decorate(proto, type) {
     "<$attrs static>";
-    {
+    {   // TODO maybe add a $pawn method
         return Object.defineProperties(proto, {
-            [$type]:     {value: type}, // store the Type model
-            [$defaults]: {get: () => type.crawlState()}, // dynamically get the state. TODO option to make this static
+            [$type]:     {value: type, enumerable: true}, // store the Type model
+            [$defaults]: {get: () => type.crawlState(), enumerable: true}, // dynamically get the state. TODO option to make this static
             upper:       {value: null, enumerable: true, writable: true}
         });
     }},
@@ -203,22 +207,23 @@ const Prototype = {
     _$extend(obj, properties, options={})
     {   "<$attrs static>";
 
-        const keys = [...Object.getOwnPropertySymbols(properties), ...Object.keys(properties)];
-
-        keys.forEach(prop => {
-            obj[$type].model[prop] = Prototype._$processDescAttrs(prop, Object.getOwnPropertyDescriptor(properties, prop), options);
-        });
-
-        keys.forEach(prop => {
-            let dsc   = obj[$type].model[prop];
+        [...Object.getOwnPropertySymbols(properties), ...Object.keys(properties)].forEach(prop => {
+            let dsc   = Prototype._$processDescAttrs(prop, Object.getOwnPropertyDescriptor(properties, prop), options);
             let names = dsc.alias || []; names.unshift(prop);
 
-            Prototype._$validate(obj, prop, dsc, obj[$type].model);
+            Prototype._$validate(obj, prop, dsc);
             Prototype._$enhanceProperty(obj, prop, dsc);
 
             names.forEach(name => {
-                if(dsc.state) {return} // continue
-                Object.defineProperty(obj, name, dsc);
+                let enumerable = dsc.enumerable;
+
+                if(dsc.state) {dsc.enumerable = false} // check if this is a good option to add to the prototype
+                Object.defineProperty(obj, name, dsc); // add to prototype
+
+                if(dsc.hasOwnProperty('value')) {Object.defineProperty(dsc, 'value', {get: () => {return obj[name]}})}
+                dsc.enumerable = enumerable;
+                obj[$type].model[name] = dsc; // add to model
+
                 if(dsc.static && obj.hasOwnProperty('constructor')) {Object.defineProperty(obj.constructor, name, dsc)}
             });
         });
@@ -432,9 +437,8 @@ const Prototype = {
      * @param {Object}        obj   - The object that was extended with the properties.
      * @param {string|Symbol} prop  - The property to be processed.
      * @param {Object}        dsc   - The property descriptor.
-     * @param {Object}        model - Object containing all descriptors of the properties currently processed.
      */
-    _$validate(obj, prop, dsc, model)
+    _$validate(obj, prop, dsc)
     {   "<$attrs static>";
         if(!dsc.validate) {return}
 
@@ -442,7 +446,7 @@ const Prototype = {
             if(!dsc.hasOwnProperty(method)) {return} // continue
 
             Prototype._$validatePrivateUse(obj, prop, dsc, method);
-            // Prototype._$validateStatics(obj, prop, dsc, method, model); // TODO use a proxy in debug mode to verify statics
+            // TODO use a proxy in debug mode to verify statics
             Prototype._$validateOverrides(obj, prop, dsc, method);
             Prototype._$validateOverwrites(obj, prop, dsc, method);
         });

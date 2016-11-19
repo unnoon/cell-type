@@ -10,7 +10,7 @@ requirejs.config({
 	baseUrl: '/base',
 
 	paths: {
-		Type: 'src/Type'
+        IOC: 'src/Kernel'
 	},
 
 	// ask Require.js to load these files (all our tests)

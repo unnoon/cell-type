@@ -33,26 +33,20 @@
 
             /************************************************/
 
-            const IControl = Type({
-                state: {
-                    x: 0,
-                    y: 0
-                },
-                properties: {
-                    left:  () => {},
-                    right: () => {},
-                },
-            });
+            const B = Type({name: 'Beginner', properties: {
+                solidProp: {[$attrs]: "solid", value: 100},
+                attachedProp: {[$attrs]: "attached", value: 200}
+            }});
 
-            const Beginner = Type({
-                implements: [IControl],
-                properties: {
-                    x:0,
-                    y:0,
-                    left:   () => {},
-                    right: () => {},
-                },
-            });
+            const b = Object.create(B, B[$defaults]);
+
+            const dsc1 = Object.getOwnPropertyDescriptor(b, 'solidProp');
+            const dsc2 = Object.getOwnPropertyDescriptor(b, 'attachedProp');
+
+            expect(dsc1.configurable).to.be.false;
+            expect(dsc1.writable).to.be.false;
+            expect(dsc2.configurable).to.be.false;
+            expect(dsc2.writable).to.be.true;
 
             /************************************************/
 

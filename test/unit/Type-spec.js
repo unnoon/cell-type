@@ -834,7 +834,7 @@ define([
                 const Beginner = Type({
                     state: {
                         pos: {[$inject]: 'IPos', state: {x: 6, y: 8}}
-                    },
+                    }
                 });
 
                 const b = Object.create(Beginner, Beginner[$defaults]);
