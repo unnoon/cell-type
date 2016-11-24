@@ -7,7 +7,7 @@
 /*? if(MODULE_TYPE !== 'es6') {*/
 !function(root, type) {
 /* istanbul ignore next */ switch(true) {
-/*amd*/    case typeof(define) === 'function' && root.define === define && !!define.amd : define(['IOC'], type);                                                              break;
+/*amd*/    case typeof(define) === 'function' && root.define === define && !!define.amd : define(['Kernel'], type);                                                              break;
 /*node*/   case typeof(module) === 'object'   && root === module.exports                : module.exports = type();                                                   break;
 /*global*/ case !root.Type                                                              : Reflect.defineProperty(root, 'Type', {value: type(), enumerable: !0}); break; default : console.error("'Type' is already defined on root object")}
 }(this, function type(ioc) { "use strict";
@@ -57,6 +57,7 @@ const Prototype = {
         this.name       = data.name || '';
         this.model      = {}; // Where the key is the name|symbol and the value an extended descriptor including additional attributes.
         this.interfaces = [];
+        this.components = [];
 
         this.add(data);
 
@@ -72,6 +73,8 @@ const Prototype = {
         if(props      = (data.properties))                         {this.properties(props)}
         if(state      = (data.state))                              {this.state(state)}
         if(interfaces = (data.implements))                         {this.implements(...interfaces)}
+
+        return this
     },
     /**
      * @name Type.$attrs
@@ -80,7 +83,7 @@ const Prototype = {
      *
      * @type Array
      */
-    $attrs: {[$attrs]: 'static', value: ATTRS},
+    $attrs: {[Type.$attrs]: 'static', value: ATTRS},
     /**
      * @private
      * @method Type._$assignAttrsToDsc
@@ -91,7 +94,7 @@ const Prototype = {
      * @param {Object}        options    - Object containing additional options.
      */
     _$assignAttrsToDsc(attributes, prop, dsc, options)
-    {   "<$attrs static>";
+    {   "use [Type.$attrs]: 'static solid'"; // TODO change attrs code to this
         // helper props
         dsc.method   = dsc.hasOwnProperty('value') && (dsc.value instanceof Function);
         dsc.accessor = !!(dsc.get || dsc.set);
@@ -135,6 +138,7 @@ const Prototype = {
     },
     crawlState()
     {
+        // TODO rewrite to general crawl method (statics, methods etc.)
         const state = crawlStateFromModel({}, this.model);
         let   proto = this.proto;
 
@@ -143,7 +147,10 @@ const Prototype = {
         function crawlStateFromModel(state, model)
         {
             [...Object.getOwnPropertySymbols(model), ...Object.keys(model)].forEach(prop => {
-                if(model[prop].state) {state[prop] = model[prop]}
+                if(!model[prop].state) {return} // continue
+
+                state[prop] = model[prop];
+                // TODO add injection code here
             });
 
             return state
@@ -391,7 +398,10 @@ const Prototype = {
     compose(...protos)
     {   "<$attrs alias=with|mixin>";
 
-        protos.forEach(proto => this.properties(proto[$type].model));
+        protos.forEach(proto => {
+            this.properties(proto[$type].model);
+            this.components.push(proto);
+        });
 
         return this
     },
