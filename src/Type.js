@@ -10,7 +10,7 @@
 /*amd*/    case typeof(define) === 'function' && root.define === define && !!define.amd : define(['Kernel'], type);                                                              break;
 /*node*/   case typeof(module) === 'object'   && root === module.exports                : module.exports = type();                                                   break;
 /*global*/ case !root.Type                                                              : Reflect.defineProperty(root, 'Type', {value: type(), enumerable: !0}); break; default : console.error("'Type' is already defined on root object")}
-}(this, function type(ioc) { "use strict";
+}(this, function type(Kernel) { "use strict";
 /*es6*//*? } else { write('export default Type\n\n') } *//*<3*/
 
 const ATTRS = ['state', 'static', 'alias', 'override', 'enumerable', 'configurable', 'writable', 'const', 'readonly', 'frozen', 'sealed', 'extensible', 'attached', 'solid', 'validate'];
@@ -26,6 +26,7 @@ const $defaults = Symbol.for('cell-type.defaults');
 const $owner    = Symbol.for('cell-type.owner'); // symbol to store the owner of a method so we can get the proper dynamic super.
 const $inner    = Symbol.for('cell-type.inner'); // reference to the wrapped inner function
 const $dsc      = Symbol.for('cell-type.dsc');   // symbol to tag an object as a cell-type descriptor
+const $inject   = Symbol.for('cell-type.inject');
 
 const Prototype = {
     /**
@@ -83,7 +84,8 @@ const Prototype = {
      *
      * @type Array
      */
-    $attrs: {[Type.$attrs]: 'static', value: ATTRS},
+    $attrs: {[$attrs]: 'static', value: ATTRS},
+    // $attrs: {[Type.$decorators]: '@static @private', value: ATTRS},
     /**
      * @private
      * @method Type._$assignAttrsToDsc
@@ -94,7 +96,10 @@ const Prototype = {
      * @param {Object}        options    - Object containing additional options.
      */
     _$assignAttrsToDsc(attributes, prop, dsc, options)
-    {   "use [Type.$attrs]: 'static solid'"; // TODO change attrs code to this
+    {   //"@alias(alias1|alias2)";
+        //"@static";
+        // "use [Type.$attrs]: 'static solid'"; // TODO change attrs code to this
+        "<$attrs static>"; // TODO change attrs code to this
         // helper props
         dsc.method   = dsc.hasOwnProperty('value') && (dsc.value instanceof Function);
         dsc.accessor = !!(dsc.get || dsc.set);
@@ -115,6 +120,7 @@ const Prototype = {
         if(dsc.property && !dsc.static)            {dsc.state        = true}
         if(dsc.solid || dsc.readonly || dsc.const) {dsc.writable     = false}
         if(dsc.solid || dsc.attached)              {dsc.configurable = false}
+        if(dsc.hasOwnProperty('value') && dsc.value[$inject]) {dsc.inject = true}
 
         dsc.enumerable = dsc.static ? true :
                          dsc.method ? false :
@@ -138,23 +144,36 @@ const Prototype = {
     },
     crawlState()
     {
+        var   _this = this;
+
+        const crawlStateFromModel = function (state, model)
+        {
+            [...Object.getOwnPropertySymbols(model), ...Object.keys(model)].forEach(prop => {
+                let dsc = model[prop];
+
+                if(!dsc.state) {return} // continue
+
+                if(dsc.inject)
+                {
+                    dsc = {
+                        value: Kernel.$pawn(_this.proto, dsc.value[$inject], dsc.value.state),
+                        enumerable: dsc.enumerable,
+                        writable: dsc.writable, // FIXME getters and setters don't have a writable option.... maybe add a readonly option & add a testcase
+                        configurable: dsc.configurable
+                    };
+                }
+
+                state[prop] = dsc;
+            });
+
+            return state
+        };
+
         // TODO rewrite to general crawl method (statics, methods etc.)
         const state = crawlStateFromModel({}, this.model);
         let   proto = this.proto;
 
         while((proto = Object.getPrototypeOf(proto)) && proto[$type]) {crawlStateFromModel(state, proto[$type].model)}
-
-        function crawlStateFromModel(state, model)
-        {
-            [...Object.getOwnPropertySymbols(model), ...Object.keys(model)].forEach(prop => {
-                if(!model[prop].state) {return} // continue
-
-                state[prop] = model[prop];
-                // TODO add injection code here
-            });
-
-            return state
-        }
 
         return state
     },

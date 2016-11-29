@@ -1,10 +1,11 @@
 define([
-    'src/Type'
-], function(Type) {
+    'src/Type',
+    'test/unit/InjectionType',
+    'test/unit/bindings'
+], function(Type, InjectionType) {
     const $type     = Symbol.for('cell-type');
     const $attrs    = Symbol.for('cell-type.attrs');
     const $defaults = Symbol.for('cell-type.defaults');
-    const $inject   = Symbol.for('cell-type.inject');
 
     describe("Type", function() {
         describe("Basic usage", function() {
@@ -829,20 +830,15 @@ define([
                 expect(s.hasOwnProperty('y')).to.be.true;
             });
 
-            xit("should be able to insert dependencies using state properties", function() {
-                // TODO
-                const Beginner = Type({
-                    state: {
-                        pos: {[$inject]: 'IPos', state: {x: 6, y: 8}}
-                    }
-                });
+            it("should be able to insert dependencies using state properties", function() {
 
-                const b = Object.create(Beginner, Beginner[$defaults]);
+                const defaults = InjectionType[$defaults];
 
-                expect(b.x).to.eql(6);
-                expect(b.hasOwnProperty('x')).to.be.true;
-                expect(b.y).to.eql(8);
-                expect(b.hasOwnProperty('y')).to.be.true;
+                const it = Object.create(InjectionType, defaults);
+
+                expect(it.pos.x).to.eql(6);
+                expect(it.pos.y).to.eql(8);
+                expect(it.hasOwnProperty('pos')).to.be.true;
             });
         });
 

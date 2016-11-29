@@ -14,17 +14,28 @@
 /*es6*//*? } else { write('export default Kernel\n\n') } *//*<3*/
 
 const $defaults = Symbol.for('cell-type.defaults');
+const $type     = Symbol.for('cell-type');
 
 const Kernel = {
     types: new Map(),
+    /**
+     *
+     * @param {Type} type
+     * @param {Type} iface
+     * @param {Type} implementation
+     *
+     * @returns {Kernel}
+     */
     bind(type, iface, implementation)
     {
+        // TODO allow iface to be a simple object
         let typeValue = this.types.get(type);
 
-        if(!typeValue)  {this.types.set(type, typeValue = {})}
-        if(!iface.name) {throw new Error('No interface name provided')}
+        if(!typeValue)         {this.types.set(type, typeValue = {})}
+        if(!iface[$type].name) {throw new Error('No interface name provided')}
+        // TODO check interface implementation
 
-        typeValue[iface.name] = implementation;
+        typeValue[iface[$type].name] = implementation;
 
         return this
     },
@@ -36,7 +47,9 @@ const Kernel = {
     {
         let impl = this.types.get(type)[iface];
 
-        return Object.create(impl, Object.assign(impl[$defaults], state || {}));
+        let obj =  Object.assign(Object.create(impl, impl[$defaults]), state || {});
+
+        return obj
     }
 };
 
